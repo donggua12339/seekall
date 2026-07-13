@@ -6,6 +6,19 @@
       <n-form ref="formRef" :model="form" :rules="rules" label-placement="top">
         <n-form-item label="邀请码" path="inviteCode">
           <n-input v-model:value="form.inviteCode" placeholder="8 位邀请码" maxlength="8" />
+          <template #feedback>
+            <span class="text-xs">
+              没有邀请码？
+              <a
+                href="https://winmelon.cn/shop/main"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-indigo-500 hover:underline"
+              >
+                点击购买邀请码
+              </a>
+            </span>
+          </template>
         </n-form-item>
         <n-form-item label="用户名" path="username">
           <n-input v-model:value="form.username" placeholder="3-32 字符，字母数字下划线" />
