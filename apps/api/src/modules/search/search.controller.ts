@@ -1,6 +1,8 @@
-import { Controller, Get, Query } from '@nestjs/common'
+import { Controller, Get, Query, Res } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger'
+import { FastifyReply } from 'fastify'
 import { SearchService } from './search.service'
+import { ProviderService } from '../provider/provider.service'
 import { CurrentUser } from '../../common/decorators/current-user.decorator'
 import { Public } from '../../common/decorators/public.decorator'
 import { IsString, IsOptional, IsInt, Min, Max } from 'class-validator'
@@ -32,7 +34,10 @@ class SearchQueryDto {
 @ApiBearerAuth()
 @Controller('search')
 export class SearchController {
-  constructor(private readonly searchService: SearchService) {}
+  constructor(
+    private readonly searchService: SearchService,
+    private readonly providerService: ProviderService,
+  ) {}
 
   @Public()
   @Get()
@@ -95,5 +100,50 @@ export class SearchController {
       totalPages: Math.ceil(list.length / dto.pageSize),
       fromIndex: fuzzy !== null,
     }
+  }
+
+  @Public()
+  @Get('stream')
+  @ApiOperation({ summary: '流式搜索（SSE，Provider 完成即推送）' })
+  async stream(@Query() dto: SearchQueryDto, @Res() reply: FastifyReply) {
+    // SSE 响应头
+    reply.raw.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no', // Nginx/Caddy 禁用缓冲
+    })
+
+    const send = (event: string, data: unknown) => {
+      reply.raw.write(`event: ${event}\n`)
+      reply.raw.write(`data: ${JSON.stringify(data)}\n\n`)
+    }
+
+    if (!dto.keyword?.trim()) {
+      send('error', { message: '关键词不能为空' })
+      reply.raw.end()
+      return
+    }
+
+    let totalResults = 0
+
+    send('start', {
+      keyword: dto.keyword,
+      providers: this.providerService.getActiveProviders().map((p) => p.name),
+    })
+
+    const { errors, durationMs } = await this.providerService.streamSearch(
+      { keyword: dto.keyword, page: dto.page, pageSize: dto.pageSize },
+      (provider, results) => {
+        totalResults += results.length
+        send('partial', { provider, results, count: results.length })
+      },
+      (provider, error) => {
+        send('provider-error', { provider, error })
+      },
+    )
+
+    send('complete', { total: totalResults, errors, durationMs })
+    reply.raw.end()
   }
 }

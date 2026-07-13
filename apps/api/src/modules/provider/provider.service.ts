@@ -94,4 +94,48 @@ export class ProviderService {
     )
     return results
   }
+
+  /**
+   * 流式搜索 - 每个 Provider 完成后立即通过回调通知
+   * 用于 SSE 端点，让前端先看到快的 Provider 结果
+   */
+  async streamSearch(
+    query: SearchQuery,
+    onPartial: (provider: string, results: SearchResult[]) => void,
+    onError: (provider: string, error: string) => void,
+  ): Promise<{ errors: string[]; durationMs: number }> {
+    const startTime = Date.now()
+    const activeProviders = this.getActiveProviders()
+    const seen = new Set<string>()
+    const errors: string[] = []
+
+    if (activeProviders.length === 0) {
+      return { errors: ['no active provider'], durationMs: 0 }
+    }
+
+    await Promise.all(
+      activeProviders.map(async (p) => {
+        try {
+          const results = await this.withTimeout(p.search(query), 10000)
+          // 去重（只返回新结果）
+          const newResults = results.filter((r) => {
+            const key = UrlUtil.hash(UrlUtil.normalize(r.url))
+            if (seen.has(key)) return false
+            seen.add(key)
+            return true
+          })
+          if (newResults.length > 0) {
+            onPartial(p.name, newResults)
+          }
+        } catch (err) {
+          const msg = (err as Error).message
+          errors.push(`${p.name}: ${msg}`)
+          onError(p.name, msg)
+          this.logger.warn(`Provider ${p.name} failed: ${msg}`)
+        }
+      }),
+    )
+
+    return { errors, durationMs: Date.now() - startTime }
+  }
 }

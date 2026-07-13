@@ -42,10 +42,16 @@ export interface SearchResultItem {
 
 const MEILI_INDEX = 'resources'
 
+// 缓存分级 TTL（秒）
+const CACHE_TTL_POPULAR = 3600 // 热门词 1h
+const CACHE_TTL_LONGTAIL = 600 // 长尾词 10min
+const CACHE_TTL_EMPTY = 30 // 空结果 30s（防穿透）
+const POPULARITY_THRESHOLD = 5 // 热门词阈值：7 天内搜索 >= 5 次
+const POPULARITY_KEY = 'popular:keywords' // Redis ZSET key
+
 @Injectable()
 export class SearchService {
   private readonly logger = new Logger(SearchService.name)
-  private readonly cacheTtl: number
   private readonly maxPageSize: number
   private readonly defaultPageSize: number
 
@@ -56,7 +62,6 @@ export class SearchService {
     private readonly configService: ConfigService,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
   ) {
-    this.cacheTtl = this.configService.get<number>('SEARCH_CACHE_TTL', 3600)
     this.maxPageSize = this.configService.get<number>('SEARCH_MAX_PAGE_SIZE', 50)
     this.defaultPageSize = this.configService.get<number>('SEARCH_DEFAULT_PAGE_SIZE', 20)
     // 初始化 Meilisearch 索引（异步，不阻塞启动）
@@ -132,12 +137,16 @@ export class SearchService {
       fromIndex: false,
     }
 
-    // 只缓存有结果的结果（空结果不缓存，避免失败被缓存）
-    if (total > 0) {
-      await this.redis.setex(cacheKey, this.cacheTtl, JSON.stringify(response)).catch(() => {
-        // 缓存写入失败不影响搜索
-      })
-    }
+    // 分级 TTL 缓存：热门 1h / 长尾 10min / 空结果 30s（防穿透）
+    const ttl = await this.getCacheTtl(req.keyword, total)
+    await this.redis.setex(cacheKey, ttl, JSON.stringify(response)).catch(() => {
+      // 缓存写入失败不影响搜索
+    })
+
+    // 更新热门关键词计数（用于分级 TTL 判断）
+    await this.bumpKeywordPopularity(req.keyword).catch(() => {
+      // 计数失败不影响搜索
+    })
 
     // 异步写入 Meilisearch 索引（用于模糊搜索）
     this.indexResults(filtered).catch((err) => {
@@ -279,6 +288,27 @@ export class SearchService {
       .update(`${keyword}|${page}|${pageSize}|${category || ''}`)
       .digest('hex')
     return `search:${hash}`
+  }
+
+  /**
+   * 分级 TTL：热门词 1h / 长尾词 10min / 空结果 30s（防穿透）
+   */
+  private async getCacheTtl(keyword: string, resultCount: number): Promise<number> {
+    if (resultCount === 0) return CACHE_TTL_EMPTY
+
+    const score = await this.redis.zscore(POPULARITY_KEY, keyword).catch(() => null)
+    const count = score ? Number(score) : 0
+    return count >= POPULARITY_THRESHOLD ? CACHE_TTL_POPULAR : CACHE_TTL_LONGTAIL
+  }
+
+  /**
+   * 更新关键词热门度（ZSET，7 天过期）
+   */
+  private async bumpKeywordPopularity(keyword: string): Promise<void> {
+    const multi = this.redis.multi()
+    multi.zincrby(POPULARITY_KEY, 1, keyword)
+    multi.expire(POPULARITY_KEY, 7 * 24 * 60 * 60)
+    await multi.exec()
   }
 
   private async logSearch(

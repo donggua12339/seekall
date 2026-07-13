@@ -190,6 +190,7 @@ model SearchLog {
 
   @@index([createdAt])
   @@index([userId])
+  @@index([query, createdAt]) // 热门搜索统计优化
   @@map("search_logs")
 }
 
