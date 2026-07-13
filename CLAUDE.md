@@ -189,9 +189,11 @@ Database
 
 ### 限流降级
 
-- 单 Provider 超时 5s
-- 全局搜索超时 8s
-- Redis 缓存热门查询 1h
+- 单 Provider 超时 10s（PanSou API 响应慢，5s 不够）
+- 全局搜索超时 15s
+- Provider 多 URL 故障转移 + 重试（最多 2 次，间隔 1s）
+- Redis 缓存热门查询 1h（v0.2 分级 TTL：热门 1h / 长尾 10min / 空结果 30s）
+- 空结果不缓存（避免失败被缓存，v0.2 改为短缓存防穿透）
 - 慢查询降级返回缓存或空结果
 
 ## API 设计规范
@@ -385,31 +387,115 @@ docker compose up -d
 - 搜索结果过滤 `dead` 链接
 - 用户可手动举报失效
 
+## 版本号约定（SemVer）
+
+- **v0.1.0** - MVP（已完成 2026-07-13）
+- **v0.2.0** - 稳定加固 + 功能扩展（进行中）
+- **v0.3.0** - 运营准备 + 开源公开
+- **v1.0.0** - 正式发布（开源稳定后）
+
 ## 当前阶段
 
-**MVP v0.1.0** - 进行中
+**v0.2.0 - 进行中**（A+B 并行：稳定加固 + 功能扩展，运营暂缓）
 
-### MVP 必做
+### MVP 必做（v0.1.0 已完成 2026-07-13）
 
-- [ ] 用户系统（注册/登录/邮箱验证/密码重置/多设备登录）
-- [ ] 后台管理（用户列表、邀请码生成、搜索日志、审计日志）
-- [ ] 邀请码 + 会员激活码（分表）
-- [ ] 搜索聚合（关键词 + 多 Provider 并发 + URL 去重）
-- [ ] Provider 框架（PanSou API + 1 个磁力站 + 1 个单网盘）
-- [ ] 搜索历史（免费 50 条 / 付费 500 条）
-- [ ] 收藏夹
-- [ ] 失效链接检测（BullMQ + link_status 表）
-- [ ] 合规框架（免责声明、用户协议、侵权举报、takedown、关键词黑名单）
-- [ ] Swagger API 文档
-- [ ] 付费用户特权：徽章 + 搜索历史容量扩大
+- [x] 用户系统（注册/登录/邮箱验证/密码重置/多设备登录）
+- [x] 后台管理（用户列表、邀请码生成、搜索日志、审计日志）
+- [x] 邀请码 + 会员激活码（分表）
+- [x] 搜索聚合（关键词 + 多 Provider 并发 + URL 去重）
+- [x] Provider 框架（PanSou API + BT4G 磁力站 + Quark 单网盘）
+- [x] 搜索历史（免费 50 条 / 付费 500 条）
+- [x] 收藏夹
+- [x] 失效链接检测（BullMQ + link_status 表）
+- [x] 合规框架（免责声明、用户协议、侵权举报、takedown、关键词黑名单）
+- [x] Swagger API 文档
+- [x] 付费用户特权：徽章 + 搜索历史容量扩大
 
-### MVP 不做
+### v0.1.0 超额完成（宪章原定 v0.2+，已提前实现）
 
-- DHT 自爬
-- TG 频道接入
-- 付费会员完整版（API 额度、去广告）
-- API 开放
-- 广告系统
-- 第三方登录
-- 资源本地索引（纯实时聚合）
-- 异地备份
+- [x] TG 频道接入（TgChannelProvider，通过 PanSou `src=channel`）
+- [x] 资源本地索引（Meilisearch，支持模糊搜索）
+- [x] 模糊搜索（B站风格分词/容错，`/search/fuzzy`）
+- [x] 组合搜索（实时 + 索引合并去重，`/search/combined`）
+- [x] 热门搜索预热（每小时 top 20 关键词预缓存）
+- [x] Sentry 监控集成（前后端错误上报 + 健康检查告警）
+- [x] CI/CD（GitHub Actions lint + test + build）
+- [x] PanSou 多源故障转移（`PANSOU_API_URLS` 多 URL + 重试）
+- [x] 前端首页美化（渐变背景、动画、特性卡片、热门搜索）
+
+### MVP 不做（修订）
+
+- ~~TG 频道接入~~ → v0.1.0 已提前实现（TgChannelProvider）
+- ~~资源本地索引~~ → v0.1.0 已提前实现（Meilisearch 模糊搜索）
+- DHT 自爬 → v0.3+（需分布式方案，单机扛不住）
+- 付费会员完整版（API 额度、去广告）→ v0.2 部分实现（API 开放）
+- ~~API 开放~~ → v0.2 实现
+- 广告系统 → v0.3+
+- ~~第三方登录~~ → v0.2 实现（GitHub OAuth）
+- 资源论坛 Provider → v0.3+（逐个适配格式）
+- 异地备份 → v0.3+
+
+### v0.2 必做
+
+#### 功能扩展（B）
+
+- [ ] 性能优化（缓存策略分级 TTL + 数据库索引审查 + Provider 流式返回）
+  - 验收标准：搜索响应 P95 < 2s（缓存命中 < 200ms）
+  - 缓存分级：热门词 1h / 长尾词 10min / 空结果 30s（防穿透）
+- [ ] GitHub OAuth 登录（`@nestjs/passport-github`，用户仍需邀请码注册 - Z++ 红线）
+  - users 表新增 `github_id` 字段
+  - OAuth 回调：已登录则绑定账号，未登录则跳转注册页（仍需邀请码）
+- [ ] API 开放（搜索 + 搜索历史，API Key 鉴权）
+  - 新增 `api_keys` 表（key_hash, name, last_used_at, revoked_at）
+  - API Key 格式：`sk_<32位随机字符>`
+  - 鉴权中间件：JWT 或 API Key 二选一
+  - 限流：免费 100 次/天，付费 1000 次/天
+  - 恢复 search.controller 的 JWT 鉴权（移除临时 @Public()）
+
+#### 稳定加固（A）
+
+- [ ] husky/eslint 修复（安装 @nuxtjs/eslint-config-typescript，恢复预提交钩子）
+- [ ] Prisma 迁移规范化（`migrate diff` 生成基线，`db push` → `migrate dev`）
+- [ ] 单元测试覆盖率达标
+  - P0 模块 80%+：auth、search、provider
+  - P1 模块 70%+：invite-code、membership-code、takedown、blocked-keyword
+  - P2 模块 60%+：user、favorite、search-history、admin、agreement、health
+- [ ] 临时 @Public() 清理（与 API 开放同步）
+- [ ] 代码小问题清理（未使用导入、mock 残留）
+
+### v0.2 不做
+
+- DHT 自爬（v0.3+，需分布式方案）
+- 资源论坛 Provider（v0.3+，逐个适配）
+- 部署到生产（等正式运营后）
+- 开源公开（等正式运营后）
+- 广告系统（v0.3+）
+
+## 版本历史（CHANGELOG 摘要）
+
+### v0.1.0（2026-07-13）- MVP 完成
+
+**必做 11 项全部完成**：
+- 用户系统、后台管理、邀请码、搜索聚合、Provider 框架、搜索历史、收藏夹、失效链接检测、合规框架、Swagger、付费特权
+
+**超额 9 项**：
+- TG 频道接入、资源本地索引、模糊搜索、组合搜索、热门预热、Sentry 监控、CI/CD、PanSou 多源故障转移、前端首页美化
+
+**基础设施**：
+- Git 首次提交（`119eee1`）
+- GitHub 仓库创建（https://github.com/donggua12339/seekall，私有）
+- 本地 MySQL 8.4 + Redis + Meilisearch 全通
+- 管理员账户创建（admin）
+
+### v0.2.0（进行中）- 稳定加固 + 功能扩展
+
+**计划功能**：
+- 性能优化（缓存 + 索引 + 流式返回，P95 < 2s）
+- GitHub OAuth 登录（用户仍需邀请码）
+- API 开放（搜索 + 搜索历史，API Key 鉴权）
+
+**技术债务清理**：
+- husky/eslint 修复
+- Prisma 迁移规范化
+- 测试覆盖率达标（P0 80%+，P1 70%+，P2 60%+）
