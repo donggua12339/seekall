@@ -21,6 +21,7 @@ import { HealthModule } from './modules/health/health.module'
 import { ApiKeyModule } from './modules/api-key/api-key.module'
 import { MailModule } from './modules/mail/mail.module'
 import { MeilisearchModule } from './modules/meilisearch/meilisearch.module'
+import { CloudAccountModule } from './modules/cloud-account/cloud-account.module'
 import { ScheduledTasksService } from './workers/scheduled-tasks.service'
 import { envValidation } from './config/env.validation'
 
@@ -72,6 +73,7 @@ import { envValidation } from './config/env.validation'
     AgreementModule,
     HealthModule,
     ApiKeyModule,
+    CloudAccountModule,
   ],
   providers: [ScheduledTasksService],
 })

@@ -4,6 +4,8 @@ import { PansouProvider } from './providers/pansou/pansou.provider'
 import { MagnetProvider } from './providers/magnet/magnet.provider'
 import { QuarkProvider } from './providers/quark/quark.provider'
 import { TgChannelProvider } from './providers/tg-channel/tg-channel.provider'
+import { TgDirectProvider } from './providers/tg-direct/tg-direct.provider'
+import { ForumProvider } from './providers/forum/forum.provider'
 import { Provider } from './interfaces/provider.interface'
 
 @Module({
@@ -13,6 +15,8 @@ import { Provider } from './interfaces/provider.interface'
     MagnetProvider,
     QuarkProvider,
     TgChannelProvider,
+    TgDirectProvider,
+    ForumProvider,
     {
       provide: 'PROVIDERS',
       useFactory: (
@@ -20,8 +24,10 @@ import { Provider } from './interfaces/provider.interface'
         magnet: MagnetProvider,
         quark: QuarkProvider,
         tgChannel: TgChannelProvider,
-      ): Provider[] => [pansou, magnet, quark, tgChannel],
-      inject: [PansouProvider, MagnetProvider, QuarkProvider, TgChannelProvider],
+        tgDirect: TgDirectProvider,
+        forum: ForumProvider,
+      ): Provider[] => [pansou, magnet, quark, tgChannel, tgDirect, forum],
+      inject: [PansouProvider, MagnetProvider, QuarkProvider, TgChannelProvider, TgDirectProvider, ForumProvider],
     },
   ],
   exports: [ProviderService],

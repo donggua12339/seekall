@@ -105,6 +105,7 @@ model User {
   adminLogs          AdminAuditLog[]      @relation("AdminAuditLogAdmin")
   userAgreements     UserAgreement[]
   apiKeys            ApiKey[]
+  cloudAccounts      CloudAccount[]
 
   @@index([status])
   @@index([isPaid])
@@ -344,4 +345,24 @@ model ApiKey {
   @@index([userId, createdAt])
   @@index([keyHash])
   @@map("api_keys")
+}
+
+// ====== 网盘账号（转存助手）======
+
+model CloudAccount {
+  id        BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  userId    BigInt   @map("user_id") @db.UnsignedBigInt
+  type      String   @db.VarChar(32) // quark / aliyun / baidu / xunlei
+  cookie    String   @db.Text // 加密存储的 Cookie
+  remark    String?  @db.VarChar(64)
+  status    String   @default("active") @db.VarChar(16) // active / expired / disabled
+  lastUsedAt DateTime? @map("last_used_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type])
+  @@index([userId])
+  @@map("cloud_accounts")
 }
