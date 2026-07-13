@@ -334,6 +334,7 @@ model ApiKey {
   keyHash     String    @unique @map("key_hash") @db.VarChar(128)
   name        String    @db.VarChar(64) // 用户自定义名称
   prefix      String    @db.VarChar(16) // sk_前8位，用于展示识别
+  scopes      Json?     // 权限范围数组：["search","search-history","favorites"]
   lastUsedAt  DateTime? @map("last_used_at")
   revokedAt   DateTime? @map("revoked_at")
   createdAt   DateTime  @default(now()) @map("created_at")

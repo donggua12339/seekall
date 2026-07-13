@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "觅源 SeekAll 搜索",
+  "version": "0.1.0",
+  "description": "在浏览器中随时搜索全网资源（网盘/磁力/TG频道）",
+  "homepage_url": "https://seekall.winmelon.cn",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "permissions": ["contextMenus", "storage", "activeTab"],
+  "host_permissions": ["https://seekall.winmelon.cn/*", "http://localhost:7301/*"],
+  "omnibox": {
+    "keyword": "seekall"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
+}

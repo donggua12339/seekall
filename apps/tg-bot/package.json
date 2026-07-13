@@ -1,0 +1,21 @@
+{
+  "name": "@seekall/tg-bot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SeekAll Telegram Bot - 在 Telegram 中搜索全网资源",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "telegraf": "^4.16.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.4.0"
+  }
+}

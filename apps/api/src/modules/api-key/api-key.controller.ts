@@ -2,14 +2,28 @@ import { Body, Controller, Get, Post, Delete, Param, ParseIntPipe } from '@nestj
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger'
 import { ApiKeyService } from './api-key.service'
 import { CurrentUser } from '../../common/decorators/current-user.decorator'
-import { IsString, Length } from 'class-validator'
+import { IsString, Length, IsArray, IsIn, IsOptional } from 'class-validator'
 import { ApiProperty } from '@nestjs/swagger'
+
+const VALID_SCOPES = ['search', 'search-history', 'favorites']
 
 class CreateApiKeyDto {
   @ApiProperty({ description: 'API Key 名称（便于识别）' })
   @IsString()
   @Length(1, 64)
   name!: string
+
+  @ApiProperty({
+    description: '权限范围',
+    example: ['search'],
+    required: false,
+    enum: VALID_SCOPES,
+    isArray: true,
+  })
+  @IsOptional()
+  @IsArray()
+  @IsIn(VALID_SCOPES, { each: true })
+  scopes?: string[]
 }
 
 @ApiTags('API Key')
@@ -21,7 +35,7 @@ export class ApiKeyController {
   @Post()
   @ApiOperation({ summary: '生成新 API Key（返回明文，仅此一次）' })
   create(@CurrentUser('sub') userId: string, @Body() dto: CreateApiKeyDto) {
-    return this.service.create(BigInt(userId), dto.name)
+    return this.service.create(BigInt(userId), dto.name, dto.scopes || ['search'])
   }
 
   @Get()

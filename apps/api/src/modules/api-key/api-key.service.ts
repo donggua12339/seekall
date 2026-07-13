@@ -14,14 +14,30 @@ export class ApiKeyService {
    * 生成新 API Key
    * 格式：sk_<32位随机hex>
    * 存储：仅存 hash（SHA-256），不存明文
+   * scopes: 权限范围 ["search","search-history","favorites"]
    */
-  async create(userId: bigint, name: string): Promise<{ key: string; id: bigint; prefix: string }> {
+  async create(
+    userId: bigint,
+    name: string,
+    scopes: string[] = ['search'],
+  ): Promise<{ key: string; id: bigint; prefix: string; scopes: string[] }> {
     if (!this.prisma.isAvailable()) {
       throw new BusinessException(ErrorCode.INTERNAL_ERROR, 503)
     }
 
     if (!name || name.length > 64) {
       throw new BusinessException(ErrorCode.PARAM_ERROR, 400, 'API Key 名称无效（1-64 字符）')
+    }
+
+    // 校验 scopes
+    const validScopes = ['search', 'search-history', 'favorites']
+    const invalidScopes = scopes.filter((s) => !validScopes.includes(s))
+    if (invalidScopes.length > 0) {
+      throw new BusinessException(
+        ErrorCode.PARAM_ERROR,
+        400,
+        `无效的权限: ${invalidScopes.join(', ')}，可选: ${validScopes.join(', ')}`,
+      )
     }
 
     // 检查用户已有 Key 数量（最多 5 个）
@@ -43,12 +59,13 @@ export class ApiKeyService {
         keyHash,
         name,
         prefix,
+        scopes,
       },
     })
 
-    this.logger.log(`API Key created: user ${userId}, name "${name}", prefix ${prefix}`)
+    this.logger.log(`API Key created: user ${userId}, name "${name}", prefix ${prefix}, scopes [${scopes.join(',')}]`)
 
-    return { key: rawKey, id: apiKey.id, prefix }
+    return { key: rawKey, id: apiKey.id, prefix, scopes }
   }
 
   /**
@@ -63,6 +80,7 @@ export class ApiKeyService {
         id: true,
         name: true,
         prefix: true,
+        scopes: true,
         lastUsedAt: true,
         revokedAt: true,
         createdAt: true,
@@ -97,9 +115,9 @@ export class ApiKeyService {
 
   /**
    * 验证 API Key（通过明文 key 查找用户）
-   * 返回 userId，未找到返回 null
+   * 返回 userId + scopes，未找到返回 null
    */
-  async validate(rawKey: string): Promise<{ userId: bigint; apiKeyId: bigint } | null> {
+  async validate(rawKey: string): Promise<{ userId: bigint; apiKeyId: bigint; scopes: string[] } | null> {
     if (!this.prisma.isAvailable()) return null
     if (!rawKey.startsWith('sk_') || rawKey.length < 10) return null
 
@@ -120,7 +138,8 @@ export class ApiKeyService {
         // 更新失败不影响验证
       })
 
-    return { userId: apiKey.userId, apiKeyId: apiKey.id }
+    const scopes = (apiKey.scopes as string[]) || ['search']
+    return { userId: apiKey.userId, apiKeyId: apiKey.id, scopes }
   }
 
   private hashKey(rawKey: string): string {
