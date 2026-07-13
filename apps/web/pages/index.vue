@@ -22,18 +22,20 @@
       <div class="w-full max-w-2xl mx-auto">
         <div class="search-box">
           <n-input-group>
-            <n-input
+            <n-auto-complete
               v-model:value="keyword"
               size="large"
-              placeholder="输入关键词搜索资源..."
+              placeholder="输入关键词搜索资源...（按 / 快速聚焦）"
+              :options="suggestions"
+              :input-props="{ class: 'search-input', autocomplete: 'off' }"
               clearable
-              class="search-input"
               @keyup.enter="handleSearch"
+              @update:value="fetchSuggestions"
             >
               <template #prefix>
                 <span class="text-gray-400">🔍</span>
               </template>
-            </n-input>
+            </n-auto-complete>
             <n-button
               size="large"
               type="primary"
@@ -118,8 +120,16 @@
 </template>
 
 <script setup lang="ts">
-import { NInput, NInputGroup, NButton, NTag, NRadioButton, NRadioGroup } from 'naive-ui'
-import { ref, onMounted } from 'vue'
+import {
+  NInput,
+  NInputGroup,
+  NButton,
+  NTag,
+  NRadioButton,
+  NRadioGroup,
+  NAutoComplete,
+} from 'naive-ui'
+import { ref, onMounted, onUnmounted } from 'vue'
 
 definePageMeta({ ssr: false })
 
@@ -128,6 +138,8 @@ const selectedCategory = ref<string>('')
 const searchMode = ref<'live' | 'fuzzy' | 'combined'>('live')
 const loading = ref(false)
 const hotKeywords = ref<string[]>([])
+const suggestions = ref<string[]>([])
+let suggestTimer: ReturnType<typeof setTimeout> | null = null
 
 const categories = [
   { label: '全部', value: '' },
@@ -153,7 +165,36 @@ function handleSearch() {
   })
 }
 
+// 搜索建议（debounced）
+function fetchSuggestions(value: string) {
+  if (suggestTimer) clearTimeout(suggestTimer)
+  if (!value || value.trim().length < 1) {
+    suggestions.value = []
+    return
+  }
+  suggestTimer = setTimeout(async () => {
+    try {
+      const data = await api.get<{ suggestions: string[] }>('/search/suggest', {
+        keyword: value,
+        limit: 8,
+      })
+      suggestions.value = data.suggestions || []
+    } catch {
+      suggestions.value = []
+    }
+  }, 300)
+}
+
+// 快捷键 / 聚焦搜索框
+function handleKeydown(e: KeyboardEvent) {
+  if (e.key === '/' && document.activeElement?.tagName !== 'INPUT') {
+    e.preventDefault()
+    document.querySelector<HTMLInputElement>('.search-input input')?.focus()
+  }
+}
+
 onMounted(async () => {
+  window.addEventListener('keydown', handleKeydown)
   // 加载热门搜索词
   try {
     const data = await api.get<{ list: Array<{ query: string; count: number }> }>(
@@ -165,6 +206,11 @@ onMounted(async () => {
     // 接口不可用时用默认热门词
     hotKeywords.value = ['三体', '流浪地球', '我的世界', '庆余年']
   }
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeydown)
+  if (suggestTimer) clearTimeout(suggestTimer)
 })
 </script>
 
