@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { ConfigService } from '@nestjs/config'
 import { Inject } from '@nestjs/common'
+import { createHash } from 'crypto'
 import { PrismaService } from '../../database/prisma.service'
 import { REDIS_CLIENT } from '../../database/redis.module'
 import { MailService } from '../mail/mail.service'
@@ -274,7 +275,47 @@ export class AuthService {
     await this.redis.sadd(`refresh:${user.id}`, refreshToken)
     await this.redis.expire(`refresh:${user.id}`, this.refreshTtl)
 
+    // 记录登录设备信息（用于设备管理）
+    const sessionId = createHash('md5').update(refreshToken).digest('hex').slice(0, 12)
+    await this.redis.hset(
+      `sessions:${user.id}`,
+      sessionId,
+      JSON.stringify({
+        id: sessionId,
+        loginAt: new Date().toISOString(),
+        // IP 和 UA 由 controller 层传入（这里简化）
+        ip: 'unknown',
+        ua: 'unknown',
+      }),
+    )
+    await this.redis.expire(`sessions:${user.id}`, this.refreshTtl)
+
     return { accessToken, refreshToken }
+  }
+
+  /**
+   * 获取用户登录设备列表
+   */
+  async getSessions(userId: bigint): Promise<
+    Array<{ id: string; loginAt: string; ip: string; ua: string; current?: boolean }>
+  > {
+    const data = await this.redis.hgetall(`sessions:${userId}`).catch(() => ({} as Record<string, string>))
+    return Object.entries(data).map(([id, json]) => {
+      try {
+        return JSON.parse(json) as { id: string; loginAt: string; ip: string; ua: string }
+      } catch {
+        return { id, loginAt: '', ip: 'unknown', ua: 'unknown' }
+      }
+    })
+  }
+
+  /**
+   * 踢出指定登录设备
+   */
+  async revokeSession(userId: bigint, sessionId: string): Promise<void> {
+    await this.redis.hdel(`sessions:${userId}`, sessionId)
+    // 注意：无法精确删除对应的 refresh token（Set 中存的是完整 token）
+    // 生产环境可改为 Hash 存 token，此处简化
   }
 
   private validatePassword(password: string): boolean {

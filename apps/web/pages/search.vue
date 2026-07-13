@@ -124,6 +124,7 @@
           <n-button size="small" tag="a" :href="item.url" target="_blank" type="primary">
             打开链接
           </n-button>
+          <n-button size="small" @click="goToDetail(item)">详情</n-button>
           <n-button size="small" @click="copyLink(item.url)">复制链接</n-button>
           <n-button size="small" @click="addToFavorite(item)">收藏</n-button>
           <n-button size="small" quaternary type="warning" @click="reportDead(item.url)">
@@ -406,6 +407,13 @@ async function addToFavorite(item: SearchResultItem) {
     message.success('已收藏')
   } catch (err) {
     message.error((err as Error).message || '收藏失败')
+  }
+}
+
+function goToDetail(item: SearchResultItem) {
+  const data = encodeURIComponent(btoa(JSON.stringify(item)))
+  router.push({ path: '/resource', query: { data } })
+}
   }
 }
 

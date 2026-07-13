@@ -1,6 +1,7 @@
-import { Body, Controller, Get, Patch, Delete, Post } from '@nestjs/common'
+import { Body, Controller, Get, Patch, Delete, Post, Param } from '@nestjs/common'
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger'
 import { UserService } from './user.service'
+import { AuthService } from '../auth/auth.service'
 import { CurrentUser } from '../../common/decorators/current-user.decorator'
 import { IsString, IsOptional, IsInt, Min, Max, IsBoolean, IsArray } from 'class-validator'
 
@@ -23,7 +24,10 @@ class ActivateMembershipDto {
 @ApiBearerAuth()
 @Controller('user')
 export class UserController {
-  constructor(private readonly userService: UserService) {}
+  constructor(
+    private readonly userService: UserService,
+    private readonly authService: AuthService,
+  ) {}
 
   @Get('profile')
   @ApiOperation({ summary: '获取个人信息' })
@@ -47,5 +51,17 @@ export class UserController {
   @ApiOperation({ summary: '激活会员' })
   activateMembership(@CurrentUser('sub') userId: string, @Body() dto: ActivateMembershipDto) {
     return this.userService.activateMembership(BigInt(userId), dto.code)
+  }
+
+  @Get('sessions')
+  @ApiOperation({ summary: '登录设备列表' })
+  listSessions(@CurrentUser('sub') userId: string) {
+    return this.authService.getSessions(BigInt(userId))
+  }
+
+  @Delete('sessions/:id')
+  @ApiOperation({ summary: '踢出指定登录设备' })
+  revokeSession(@CurrentUser('sub') userId: string, @Param('id') sessionId: string) {
+    return this.authService.revokeSession(BigInt(userId), sessionId)
   }
 }

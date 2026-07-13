@@ -52,6 +52,16 @@
           <BlockedKeywordManager />
         </n-tab-pane>
 
+        <!-- 数据分析 -->
+        <n-tab-pane name="analytics" tab="数据分析">
+          <AnalyticsManager />
+        </n-tab-pane>
+
+        <!-- Provider 健康度 -->
+        <n-tab-pane name="provider-stats" tab="Provider 健康度">
+          <ProviderStats />
+        </n-tab-pane>
+
         <!-- 审计日志 -->
         <n-tab-pane name="audit-logs" tab="审计日志">
           <n-data-table :columns="auditColumns" :data="auditLogs" :loading="loadingAudit" />

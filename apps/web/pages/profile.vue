@@ -33,6 +33,7 @@
       </n-card>
 
       <!-- 偏好设置 -->
+      <!-- 偏好设置 -->
       <n-card title="偏好设置">
         <n-form label-placement="left" :label-width="120">
           <n-form-item label="主题">
@@ -53,6 +54,9 @@
           </n-form-item>
         </n-form>
       </n-card>
+
+      <!-- 登录设备管理 -->
+      <UserSessions />
 
       <!-- 危险操作 -->
       <n-card title="危险操作">
