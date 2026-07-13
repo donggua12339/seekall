@@ -5,7 +5,12 @@
         <n-spin size="large" />
         <p class="mt-4 text-gray-500">正在验证邮箱...</p>
       </div>
-      <n-result v-else-if="status === 'success'" status="success" title="验证成功" description="邮箱已验证，现在可以登录了">
+      <n-result
+        v-else-if="status === 'success'"
+        status="success"
+        title="验证成功"
+        description="邮箱已验证，现在可以登录了"
+      >
         <template #footer>
           <n-button type="primary" @click="router.push('/auth/login')">去登录</n-button>
         </template>

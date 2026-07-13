@@ -31,14 +31,21 @@ const columns = [
     title: '操作',
     key: 'actions',
     render: (row: { id: bigint }) =>
-      h(NButton, { size: 'small', type: 'error', quaternary: true, onClick: () => removeKeyword(row.id) }, () => '删除'),
+      h(
+        NButton,
+        { size: 'small', type: 'error', quaternary: true, onClick: () => removeKeyword(row.id) },
+        () => '删除',
+      ),
   },
 ]
 
 async function load() {
   loading.value = true
   try {
-    const data = await api.get<{ list: unknown[] }>('/admin/blocked-keywords', { page: 1, pageSize: 100 })
+    const data = await api.get<{ list: unknown[] }>('/admin/blocked-keywords', {
+      page: 1,
+      pageSize: 100,
+    })
     keywords.value = data.list
   } finally {
     loading.value = false

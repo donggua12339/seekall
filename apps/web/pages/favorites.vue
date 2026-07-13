@@ -40,7 +40,10 @@ const message = useMessage()
 
 const loading = ref(false)
 const page = ref(1)
-const result = ref<{ list: { id: bigint; title: string; resourceUrl: string; source: string }[]; totalPages: number } | null>(null)
+const result = ref<{
+  list: { id: bigint; title: string; resourceUrl: string; source: string }[]
+  totalPages: number
+} | null>(null)
 
 async function load() {
   if (!useAuthStore().isLoggedIn) {

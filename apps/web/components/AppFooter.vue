@@ -9,11 +9,11 @@
         <NuxtLink to="/about" class="hover:text-indigo-600">关于</NuxtLink>
       </div>
       <p class="text-xs">
-        © {{ new Date().getFullYear() }} 觅源 SeekAll · AGPL-3.0 · 本站仅做链接聚合，不存储任何文件内容
+        © {{ new Date().getFullYear() }} 觅源 SeekAll · AGPL-3.0 ·
+        本站仅做链接聚合，不存储任何文件内容
       </p>
     </div>
   </footer>
 </template>
 
-<script setup lang="ts">
-</script>
+<script setup lang="ts"></script>

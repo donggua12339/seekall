@@ -9,12 +9,10 @@
           v-model:value="keyword"
           size="large"
           placeholder="输入关键词..."
-          @keyup.enter="doSearch"
           clearable
+          @keyup.enter="doSearch"
         />
-        <n-button size="large" type="primary" @click="doSearch" :loading="loading">
-          搜索
-        </n-button>
+        <n-button size="large" type="primary" :loading="loading" @click="doSearch"> 搜索 </n-button>
       </n-input-group>
     </div>
 
@@ -27,7 +25,9 @@
       </n-radio-group>
       <span class="text-xs text-gray-400">
         <template v-if="searchMode === 'live'">多源并发聚合，结果最新</template>
-        <template v-else-if="searchMode === 'fuzzy'">本地索引，支持拼音/分词/容错，速度极快</template>
+        <template v-else-if="searchMode === 'fuzzy'"
+          >本地索引，支持拼音/分词/容错，速度极快</template
+        >
         <template v-else>实时 + 索引合并去重，召回率最高</template>
       </span>
     </div>
@@ -35,7 +35,9 @@
     <!-- 结果信息 -->
     <div v-if="result" class="text-sm text-gray-500 mb-4 flex-between">
       <div>
-        共找到 <span class="font-semibold text-gray-700 dark:text-gray-300">{{ result.total }}</span> 条结果
+        共找到
+        <span class="font-semibold text-gray-700 dark:text-gray-300">{{ result.total }}</span>
+        条结果
         <span class="ml-2">耗时 {{ result.durationMs }}ms</span>
         <n-tag v-if="result.fromIndex" size="tiny" type="info" class="ml-2">来自索引</n-tag>
         <span v-if="result.errors && result.errors.length > 0" class="text-yellow-600 ml-2">
@@ -74,7 +76,9 @@
         </div>
 
         <!-- 元数据行 -->
-        <div class="flex items-center gap-3 flex-wrap text-xs text-gray-500 dark:text-gray-400 mb-3">
+        <div
+          class="flex items-center gap-3 flex-wrap text-xs text-gray-500 dark:text-gray-400 mb-3"
+        >
           <span v-if="item.fileType" class="flex items-center gap-1">
             <n-icon><cloud-icon /></n-icon>
             {{ item.fileType }}
@@ -102,14 +106,14 @@
           </n-button>
           <n-button size="small" @click="copyLink(item.url)">复制链接</n-button>
           <n-button size="small" @click="addToFavorite(item)">收藏</n-button>
-          <n-button size="small" @click="reportDead(item.url)" quaternary type="warning">
+          <n-button size="small" quaternary type="warning" @click="reportDead(item.url)">
             举报失效
           </n-button>
         </div>
       </n-card>
 
       <!-- 分页 -->
-      <div class="flex-center pt-4" v-if="result.totalPages > 1">
+      <div v-if="result.totalPages > 1" class="flex-center pt-4">
         <n-pagination
           v-model:page="page"
           :page-count="result.totalPages"
@@ -126,9 +130,7 @@
             <n-button v-if="searchMode !== 'fuzzy'" type="primary" @click="switchToFuzzy">
               试试模糊搜索
             </n-button>
-            <n-button quaternary @click="switchToCombined">
-              尝试组合搜索
-            </n-button>
+            <n-button quaternary @click="switchToCombined"> 尝试组合搜索 </n-button>
           </n-space>
         </template>
       </n-empty>
@@ -138,8 +140,18 @@
 
 <script setup lang="ts">
 import {
-  NInput, NInputGroup, NButton, NCard, NTag, NPagination, NSkeleton, NEmpty,
-  NRadioButton, NRadioGroup, NIcon, NSpace,
+  NInput,
+  NInputGroup,
+  NButton,
+  NCard,
+  NTag,
+  NPagination,
+  NSkeleton,
+  NEmpty,
+  NRadioButton,
+  NRadioGroup,
+  NIcon,
+  NSpace,
   useMessage,
 } from 'naive-ui'
 import { ref, computed, watch, onMounted, h } from 'vue'
@@ -188,7 +200,9 @@ const page = ref(1)
 const pageSize = ref(20)
 const loading = ref(false)
 const result = ref<SearchResponse | null>(null)
-const searchMode = ref<'live' | 'fuzzy' | 'combined'>((route.query.mode as 'live' | 'fuzzy' | 'combined') || 'live')
+const searchMode = ref<'live' | 'fuzzy' | 'combined'>(
+  (route.query.mode as 'live' | 'fuzzy' | 'combined') || 'live',
+)
 
 const providersTagType = computed<'default' | 'success' | 'info' | 'warning'>(() => {
   if (!result.value) return 'default'
@@ -214,11 +228,12 @@ async function doSearch() {
   })
 
   try {
-    const endpoint = searchMode.value === 'fuzzy'
-      ? '/search/fuzzy'
-      : searchMode.value === 'combined'
-        ? '/search/combined'
-        : '/search'
+    const endpoint =
+      searchMode.value === 'fuzzy'
+        ? '/search/fuzzy'
+        : searchMode.value === 'combined'
+          ? '/search/combined'
+          : '/search'
 
     result.value = await api.get<SearchResponse>(endpoint, {
       keyword: keyword.value,
@@ -250,18 +265,21 @@ function switchToCombined() {
   doSearch()
 }
 
-watch(() => route.query, () => {
-  const q = route.query.q as string
-  const mode = route.query.mode as 'live' | 'fuzzy' | 'combined'
-  if (q && q !== keyword.value) {
-    keyword.value = q
-  }
-  if (mode && mode !== searchMode.value) {
-    searchMode.value = mode
-  }
-  page.value = 1
-  doSearch()
-})
+watch(
+  () => route.query,
+  () => {
+    const q = route.query.q as string
+    const mode = route.query.mode as 'live' | 'fuzzy' | 'combined'
+    if (q && q !== keyword.value) {
+      keyword.value = q
+    }
+    if (mode && mode !== searchMode.value) {
+      searchMode.value = mode
+    }
+    page.value = 1
+    doSearch()
+  },
+)
 
 onMounted(() => {
   if (keyword.value) {

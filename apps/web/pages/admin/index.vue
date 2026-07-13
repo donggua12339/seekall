@@ -24,7 +24,12 @@
 
         <!-- 用户管理 -->
         <n-tab-pane name="users" tab="用户管理">
-          <n-data-table :columns="userColumns" :data="users" :loading="loadingUsers" :pagination="userPagination" />
+          <n-data-table
+            :columns="userColumns"
+            :data="users"
+            :loading="loadingUsers"
+            :pagination="userPagination"
+          />
         </n-tab-pane>
 
         <!-- 邀请码管理 -->
@@ -57,10 +62,8 @@
 </template>
 
 <script setup lang="ts">
-import {
-  NTabs, NTabPane, NStatistic, NDataTable, NButton,
-} from 'naive-ui'
-import { ref, onMounted, h } from 'vue'
+import { NTabs, NTabPane, NStatistic, NDataTable, NButton } from 'naive-ui'
+import { ref, onMounted } from 'vue'
 import { useAuthStore } from '~/stores/auth'
 
 definePageMeta({ layout: 'admin' })
@@ -70,7 +73,11 @@ const authStore = useAuthStore()
 const router = useRouter()
 const { api } = useApi()
 
-const dashboard = ref<{ users: { total: number; paid: number }; searches: { today: number }; takedown: { pending: number } } | null>(null)
+const dashboard = ref<{
+  users: { total: number; paid: number }
+  searches: { today: number }
+  takedown: { pending: number }
+} | null>(null)
 const users = ref<unknown[]>([])
 const loadingUsers = ref(false)
 const userPagination = ref({ page: 1, pageSize: 20, itemCount: 0 })
@@ -83,13 +90,25 @@ const userColumns = [
   { title: '用户名', key: 'username' },
   { title: '邮箱', key: 'email' },
   { title: '角色', key: 'role' },
-  { title: '付费', key: 'isPaid', render: (row: { isPaid: boolean }) => row.isPaid ? '是' : '否' },
+  {
+    title: '付费',
+    key: 'isPaid',
+    render: (row: { isPaid: boolean }) => (row.isPaid ? '是' : '否'),
+  },
   { title: '状态', key: 'status' },
-  { title: '注册时间', key: 'createdAt', render: (row: { createdAt: string }) => new Date(row.createdAt).toLocaleString() },
+  {
+    title: '注册时间',
+    key: 'createdAt',
+    render: (row: { createdAt: string }) => new Date(row.createdAt).toLocaleString(),
+  },
 ]
 
 const auditColumns = [
-  { title: '时间', key: 'createdAt', render: (row: { createdAt: string }) => new Date(row.createdAt).toLocaleString() },
+  {
+    title: '时间',
+    key: 'createdAt',
+    render: (row: { createdAt: string }) => new Date(row.createdAt).toLocaleString(),
+  },
   { title: '管理员', key: 'admin.username' },
   { title: '操作', key: 'action' },
   { title: '目标', key: 'targetType' },

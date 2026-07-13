@@ -1,9 +1,7 @@
 <template>
   <div class="container mx-auto px-4 py-8 max-w-md">
     <n-card title="注册">
-      <n-alert type="info" class="mb-4">
-        注册需要邀请码，请通过 WM 发卡网购买后填写
-      </n-alert>
+      <n-alert type="info" class="mb-4"> 注册需要邀请码，请通过 WM 发卡网购买后填写 </n-alert>
 
       <n-form ref="formRef" :model="form" :rules="rules" label-placement="top">
         <n-form-item label="邀请码" path="inviteCode">
@@ -16,7 +14,11 @@
           <n-input v-model:value="form.email" placeholder="用于验证和密码重置" />
         </n-form-item>
         <n-form-item label="密码" path="password">
-          <n-input v-model:value="form.password" type="password" placeholder="至少 8 位，含字母和数字" />
+          <n-input
+            v-model:value="form.password"
+            type="password"
+            placeholder="至少 8 位，含字母和数字"
+          />
         </n-form-item>
 
         <n-checkbox v-model:checked="agreed" class="mb-4">
@@ -24,7 +26,13 @@
           <NuxtLink to="/agreement" target="_blank" class="text-indigo-500">用户协议</NuxtLink>
         </n-checkbox>
 
-        <n-button type="primary" block :loading="loading" :disabled="!agreed" @click="handleRegister">
+        <n-button
+          type="primary"
+          block
+          :loading="loading"
+          :disabled="!agreed"
+          @click="handleRegister"
+        >
           注册
         </n-button>
       </n-form>

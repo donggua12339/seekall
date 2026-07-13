@@ -38,7 +38,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function register(payload: {
+  function register(payload: {
     inviteCode: string
     username: string
     email: string
@@ -89,7 +89,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /** GitHub OAuth 登录用：直接设置 token */
-  async function setTokens(access: string, refresh: string) {
+  function setTokens(access: string, refresh: string) {
     accessToken.value = access
     refreshToken.value = refresh
     if (import.meta.client) {
@@ -102,7 +102,9 @@ export const useAuthStore = defineStore('auth', () => {
   async function fetchProfile() {
     if (!accessToken.value) return
     try {
-      const data = await $fetch<{ data: { id: string; username: string; role: string; isPaid: boolean } }>('/api/v1/user/profile', {
+      const data = await $fetch<{
+        data: { id: string; username: string; role: string; isPaid: boolean }
+      }>('/api/v1/user/profile', {
         headers: { Authorization: `Bearer ${accessToken.value}` },
       })
       user.value = data.data

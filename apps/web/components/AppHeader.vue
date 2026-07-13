@@ -1,5 +1,7 @@
 <template>
-  <header class="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 sticky top-0 z-50">
+  <header
+    class="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 sticky top-0 z-50"
+  >
     <div class="container mx-auto px-4 py-3 flex-between">
       <div class="flex items-center gap-4">
         <NuxtLink to="/" class="text-xl font-bold text-indigo-600 dark:text-indigo-400">
@@ -15,23 +17,23 @@
           搜索
         </NuxtLink>
         <NuxtLink
+          v-if="authStore.isLoggedIn"
           to="/favorites"
           class="px-3 py-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-sm"
-          v-if="authStore.isLoggedIn"
         >
           收藏
         </NuxtLink>
         <NuxtLink
+          v-if="authStore.isLoggedIn"
           to="/profile"
           class="px-3 py-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-sm"
-          v-if="authStore.isLoggedIn"
         >
           个人主页
         </NuxtLink>
         <NuxtLink
+          v-if="authStore.isAdmin"
           to="/admin"
           class="px-3 py-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-sm"
-          v-if="authStore.isAdmin"
         >
           后台
         </NuxtLink>

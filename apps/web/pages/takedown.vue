@@ -15,11 +15,14 @@
           <n-input v-model:value="form.resourceUrl" placeholder="https://..." />
         </n-form-item>
         <n-form-item label="举报理由" path="reason">
-          <n-input v-model:value="form.reason" type="textarea" :rows="4" placeholder="详细描述侵权理由，如版权方、原作品信息等" />
+          <n-input
+            v-model:value="form.reason"
+            type="textarea"
+            :rows="4"
+            placeholder="详细描述侵权理由，如版权方、原作品信息等"
+          />
         </n-form-item>
-        <n-button type="primary" :loading="loading" @click="handleSubmit">
-          提交举报
-        </n-button>
+        <n-button type="primary" :loading="loading" @click="handleSubmit"> 提交举报 </n-button>
       </n-form>
     </n-card>
   </div>

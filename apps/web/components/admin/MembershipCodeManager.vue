@@ -3,12 +3,15 @@
     <div class="flex-between mb-4">
       <n-space>
         <n-input-number v-model:value="generateCount" :min="1" :max="1000" placeholder="数量" />
-        <n-input-number v-model:value="durationDays" :min="1" :max="3650" placeholder="时长（天）" />
-        <n-button type="primary" :loading="generating" @click="handleGenerate">
-          批量生成
-        </n-button>
+        <n-input-number
+          v-model:value="durationDays"
+          :min="1"
+          :max="3650"
+          placeholder="时长（天）"
+        />
+        <n-button type="primary" :loading="generating" @click="handleGenerate"> 批量生成 </n-button>
       </n-space>
-      <n-button @click="exportCodes" :loading="exporting">导出未使用（CSV）</n-button>
+      <n-button :loading="exporting" @click="exportCodes">导出未使用（CSV）</n-button>
     </div>
 
     <n-data-table :columns="columns" :data="codes" :loading="loading" :pagination="pagination" />
@@ -17,7 +20,7 @@
 
 <script setup lang="ts">
 import { NInputNumber, NButton, NDataTable, NSpace, useMessage } from 'naive-ui'
-import { ref, reactive, onMounted, h } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 
 const { api } = useApi()
 const message = useMessage()
@@ -71,8 +74,13 @@ async function handleGenerate() {
 async function exportCodes() {
   exporting.value = true
   try {
-    const codes = await api.get<{ code: string; durationDays: number; createdAt: string }[]>('/admin/membership-codes/export')
-    const csv = ['code,duration_days,created_at', ...codes.map((c) => `${c.code},${c.durationDays},${c.createdAt}`)].join('\n')
+    const codes = await api.get<{ code: string; durationDays: number; createdAt: string }[]>(
+      '/admin/membership-codes/export',
+    )
+    const csv = [
+      'code,duration_days,created_at',
+      ...codes.map((c) => `${c.code},${c.durationDays},${c.createdAt}`),
+    ].join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')

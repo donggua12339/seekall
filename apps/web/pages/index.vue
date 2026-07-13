@@ -14,12 +14,8 @@
         <div class="logo-icon mb-4">
           <span class="text-5xl">🔍</span>
         </div>
-        <h1 class="text-5xl md:text-6xl font-bold mb-3 title-gradient">
-          觅源 SeekAll
-        </h1>
-        <p class="text-gray-600 dark:text-gray-400 text-lg md:text-xl">
-          觅寻全网资源，一站即达
-        </p>
+        <h1 class="text-5xl md:text-6xl font-bold mb-3 title-gradient">觅源 SeekAll</h1>
+        <p class="text-gray-600 dark:text-gray-400 text-lg md:text-xl">觅寻全网资源，一站即达</p>
       </div>
 
       <!-- 搜索框 -->
@@ -30,15 +26,21 @@
               v-model:value="keyword"
               size="large"
               placeholder="输入关键词搜索资源..."
-              @keyup.enter="handleSearch"
               clearable
               class="search-input"
+              @keyup.enter="handleSearch"
             >
               <template #prefix>
                 <span class="text-gray-400">🔍</span>
               </template>
             </n-input>
-            <n-button size="large" type="primary" @click="handleSearch" :loading="loading" class="search-btn">
+            <n-button
+              size="large"
+              type="primary"
+              :loading="loading"
+              class="search-btn"
+              @click="handleSearch"
+            >
               搜索
             </n-button>
           </n-input-group>
@@ -76,7 +78,10 @@
             size="small"
             class="cursor-pointer mr-2 mb-2"
             round
-            @click="keyword = kw; handleSearch()"
+            @click="
+              keyword = kw
+              handleSearch()
+            "
           >
             {{ kw }}
           </n-tag>
@@ -154,7 +159,10 @@ function handleSearch() {
 onMounted(async () => {
   // 加载热门搜索词
   try {
-    const data = await api.get<{ list: Array<{ query: string; count: number }> }>('/search-history/popular', { limit: 10 })
+    const data = await api.get<{ list: Array<{ query: string; count: number }> }>(
+      '/search-history/popular',
+      { limit: 10 },
+    )
     hotKeywords.value = data.list.map((item) => item.query).filter(Boolean)
   } catch {
     // 接口不可用时用默认热门词
@@ -216,9 +224,16 @@ onMounted(async () => {
 }
 
 @keyframes float {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(30px, -30px) scale(1.1); }
-  66% { transform: translate(-20px, 20px) scale(0.95); }
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  33% {
+    transform: translate(30px, -30px) scale(1.1);
+  }
+  66% {
+    transform: translate(-20px, 20px) scale(0.95);
+  }
 }
 
 .content-wrapper {
@@ -233,8 +248,13 @@ onMounted(async () => {
 }
 
 @keyframes bounce {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
 }
 
 .title-gradient {

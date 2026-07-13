@@ -14,8 +14,7 @@ export default defineNuxtConfig({
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
         {
           name: 'description',
-          content:
-            '觅源 SeekAll - 全网资源聚合搜索引擎，一站式搜索网盘、磁力、TG 频道资源',
+          content: '觅源 SeekAll - 全网资源聚合搜索引擎，一站式搜索网盘、磁力、TG 频道资源',
         },
         { name: 'referrer', content: 'strict-origin-when-cross-origin' },
         { name: 'robots', content: 'noindex, nofollow' }, // 私人小圈子，不收录

@@ -26,7 +26,16 @@
 </template>
 
 <script setup lang="ts">
-import { darkTheme, zhCN, dateZhCN, NConfigProvider, NLoadingBarProvider, NMessageProvider, NDialogProvider, NNotificationProvider } from 'naive-ui'
+import {
+  darkTheme,
+  zhCN,
+  dateZhCN,
+  NConfigProvider,
+  NLoadingBarProvider,
+  NMessageProvider,
+  NDialogProvider,
+  NNotificationProvider,
+} from 'naive-ui'
 import { computed } from 'vue'
 
 const colorMode = useColorMode()

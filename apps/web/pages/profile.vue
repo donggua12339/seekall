@@ -22,16 +22,14 @@
       </n-card>
 
       <!-- 会员激活 -->
-      <n-card title="会员激活" v-if="!user.isPaid">
+      <n-card v-if="!user.isPaid" title="会员激活">
         <n-input-group>
           <n-input v-model:value="membershipCode" placeholder="输入会员激活码" />
           <n-button type="primary" :loading="activating" @click="activateMembership">
             激活
           </n-button>
         </n-input-group>
-        <p class="text-xs text-gray-400 mt-2">
-          会员激活码请通过 WM 发卡网购买
-        </p>
+        <p class="text-xs text-gray-400 mt-2">会员激活码请通过 WM 发卡网购买</p>
       </n-card>
 
       <!-- 偏好设置 -->
@@ -51,18 +49,14 @@
             <n-switch v-model:value="preferences.safeSearch" />
           </n-form-item>
           <n-form-item label=" ">
-            <n-button type="primary" :loading="saving" @click="savePreferences">
-              保存
-            </n-button>
+            <n-button type="primary" :loading="saving" @click="savePreferences"> 保存 </n-button>
           </n-form-item>
         </n-form>
       </n-card>
 
       <!-- 危险操作 -->
       <n-card title="危险操作">
-        <n-button type="error" ghost @click="handleDeleteAccount">
-          注销账号
-        </n-button>
+        <n-button type="error" ghost @click="handleDeleteAccount"> 注销账号 </n-button>
         <p class="text-xs text-gray-400 mt-2">
           注销后账号将进入 30 天保留期，期间用户名不可重新注册
         </p>
@@ -73,8 +67,20 @@
 
 <script setup lang="ts">
 import {
-  NCard, NAvatar, NTag, NInput, NInputGroup, NButton, NForm, NFormItem,
-  NRadioGroup, NRadio, NSelect, NSwitch, useMessage, useDialog,
+  NCard,
+  NAvatar,
+  NTag,
+  NInput,
+  NInputGroup,
+  NButton,
+  NForm,
+  NFormItem,
+  NRadioGroup,
+  NRadio,
+  NSelect,
+  NSwitch,
+  useMessage,
+  useDialog,
 } from 'naive-ui'
 import { ref, reactive, onMounted } from 'vue'
 import { useAuthStore } from '~/stores/auth'
@@ -112,8 +118,13 @@ onMounted(async () => {
   try {
     const data = await api.get('/user/profile')
     user.value = data as never
-    if ((data as { preferences?: { theme?: string; searchPageSize?: number; safeSearch?: boolean } }).preferences) {
-      const p = (data as { preferences: { theme?: string; searchPageSize?: number; safeSearch?: boolean } }).preferences
+    if (
+      (data as { preferences?: { theme?: string; searchPageSize?: number; safeSearch?: boolean } })
+        .preferences
+    ) {
+      const p = (
+        data as { preferences: { theme?: string; searchPageSize?: number; safeSearch?: boolean } }
+      ).preferences
       preferences.theme = p.theme || 'auto'
       preferences.searchPageSize = p.searchPageSize || 20
       preferences.safeSearch = p.safeSearch ?? true

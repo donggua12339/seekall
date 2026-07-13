@@ -19,10 +19,7 @@ export function useApi() {
   const config = useRuntimeConfig()
   const authStore = useAuthStore()
 
-  async function request<T = unknown>(
-    path: string,
-    options: RequestOptions = {},
-  ): Promise<T> {
+  async function request<T = unknown>(path: string, options: RequestOptions = {}): Promise<T> {
     const { method = 'GET', body, query, headers = {} } = options
 
     // 鉴权头
@@ -68,12 +65,10 @@ export function useApi() {
   const api = {
     get: <T = unknown>(path: string, query?: Record<string, unknown>) =>
       request<T>(path, { method: 'GET', query }),
-    post: <T = unknown>(path: string, body?: unknown) =>
-      request<T>(path, { method: 'POST', body }),
+    post: <T = unknown>(path: string, body?: unknown) => request<T>(path, { method: 'POST', body }),
     patch: <T = unknown>(path: string, body?: unknown) =>
       request<T>(path, { method: 'PATCH', body }),
-    delete: <T = unknown>(path: string) =>
-      request<T>(path, { method: 'DELETE' }),
+    delete: <T = unknown>(path: string) => request<T>(path, { method: 'DELETE' }),
   }
 
   return { api, request }

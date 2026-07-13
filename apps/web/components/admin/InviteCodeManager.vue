@@ -3,11 +3,9 @@
     <div class="flex-between mb-4">
       <n-space>
         <n-input-number v-model:value="generateCount" :min="1" :max="1000" placeholder="生成数量" />
-        <n-button type="primary" :loading="generating" @click="handleGenerate">
-          批量生成
-        </n-button>
+        <n-button type="primary" :loading="generating" @click="handleGenerate"> 批量生成 </n-button>
       </n-space>
-      <n-button @click="exportCodes" :loading="exporting">导出未使用（CSV）</n-button>
+      <n-button :loading="exporting" @click="exportCodes">导出未使用（CSV）</n-button>
     </div>
 
     <n-data-table :columns="columns" :data="codes" :loading="loading" :pagination="pagination" />
@@ -39,7 +37,11 @@ const columns = [
     key: 'actions',
     render: (row: { id: bigint; status: string }) =>
       row.status === 'unused'
-        ? h(NButton, { size: 'small', quaternary: true, onClick: () => disableCode(row.id) }, () => '禁用')
+        ? h(
+            NButton,
+            { size: 'small', quaternary: true, onClick: () => disableCode(row.id) },
+            () => '禁用',
+          )
         : null,
   },
 ]

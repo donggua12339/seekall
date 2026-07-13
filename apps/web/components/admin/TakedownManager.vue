@@ -21,14 +21,22 @@ const columns = [
   { title: '资源链接', key: 'resourceUrl', ellipsis: { tooltip: true } },
   { title: '理由', key: 'reason', ellipsis: { tooltip: true } },
   { title: '状态', key: 'status' },
-  { title: '时间', key: 'createdAt', render: (row: { createdAt: string }) => new Date(row.createdAt).toLocaleString() },
+  {
+    title: '时间',
+    key: 'createdAt',
+    render: (row: { createdAt: string }) => new Date(row.createdAt).toLocaleString(),
+  },
   {
     title: '操作',
     key: 'actions',
     render: (row: { id: bigint; status: string }) =>
       row.status === 'pending'
         ? h('div', { class: 'flex gap-2' }, [
-            h(NButton, { size: 'small', type: 'error', onClick: () => resolve(row.id, 'resolved') }, () => '下架'),
+            h(
+              NButton,
+              { size: 'small', type: 'error', onClick: () => resolve(row.id, 'resolved') },
+              () => '下架',
+            ),
             h(NButton, { size: 'small', onClick: () => resolve(row.id, 'rejected') }, () => '驳回'),
           ])
         : null,
