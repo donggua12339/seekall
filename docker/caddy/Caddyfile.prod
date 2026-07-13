@@ -1,0 +1,56 @@
+# 觅源 SeekAll - 生产环境 Caddyfile
+# 用法：复制到 /etc/caddy/Caddyfile，重启 Caddy
+#   sudo cp docker/caddy/Caddyfile.prod /etc/caddy/Caddyfile
+#   sudo systemctl reload caddy
+
+seekall.winmelon.cn {
+    # API
+    handle /api/* {
+        reverse_proxy localhost:7301
+    }
+
+    # Swagger（生产关闭，如需开启设 SWAGGER_ENABLED=true）
+    handle /docs* {
+        reverse_proxy localhost:7301
+    }
+
+    # 前端 SSR
+    handle {
+        reverse_proxy localhost:7300
+    }
+
+    # 安全头
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy strict-origin-when-cross-origin
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-XSS-Protection "1; mode=block"
+        Permissions-Policy "geolocation=(), microphone=(), camera=()"
+    }
+
+    # 压缩
+    encode gzip zstd
+
+    # 日志
+    log {
+        output file /var/log/seekall/caddy.log
+        format json
+    }
+}
+
+admin.seekall.winmelon.cn {
+    reverse_proxy localhost:7300
+
+    header {
+        X-Content-Type-Options nosniff
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    }
+
+    encode gzip zstd
+
+    log {
+        output file /var/log/seekall/caddy-admin.log
+        format json
+    }
+}
