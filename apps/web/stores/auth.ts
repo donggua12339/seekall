@@ -88,6 +88,32 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  /** GitHub OAuth 登录用：直接设置 token */
+  async function setTokens(access: string, refresh: string) {
+    accessToken.value = access
+    refreshToken.value = refresh
+    if (import.meta.client) {
+      localStorage.setItem('seekall_access_token', access)
+      localStorage.setItem('seekall_refresh_token', refresh)
+    }
+  }
+
+  /** 获取用户资料（GitHub 登录用） */
+  async function fetchProfile() {
+    if (!accessToken.value) return
+    try {
+      const data = await $fetch<{ data: { id: string; username: string; role: string; isPaid: boolean } }>('/api/v1/user/profile', {
+        headers: { Authorization: `Bearer ${accessToken.value}` },
+      })
+      user.value = data.data
+      if (import.meta.client) {
+        localStorage.setItem('seekall_user', JSON.stringify(data.data))
+      }
+    } catch {
+      // 忽略错误
+    }
+  }
+
   return {
     user,
     accessToken,
@@ -100,5 +126,7 @@ export const useAuthStore = defineStore('auth', () => {
     refresh,
     logout,
     loadFromStorage,
+    setTokens,
+    fetchProfile,
   }
 })

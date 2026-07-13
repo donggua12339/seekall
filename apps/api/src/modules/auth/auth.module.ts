@@ -5,6 +5,7 @@ import { APP_GUARD } from '@nestjs/core'
 import { AuthController } from './auth.controller'
 import { AuthService } from './auth.service'
 import { JwtStrategy } from './jwt.strategy'
+import { GithubStrategy } from './github.strategy'
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard'
 import { MailModule } from '../mail/mail.module'
 
@@ -20,7 +21,7 @@ import { MailModule } from '../mail/mail.module'
     MailModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, {
+  providers: [AuthService, JwtStrategy, GithubStrategy, {
     provide: APP_GUARD,
     useClass: JwtAuthGuard,
   }],
