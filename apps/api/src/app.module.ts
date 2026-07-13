@@ -18,6 +18,7 @@ import { LinkCheckerModule } from './modules/link-checker/link-checker.module'
 import { AdminModule } from './modules/admin/admin.module'
 import { AgreementModule } from './modules/agreement/agreement.module'
 import { HealthModule } from './modules/health/health.module'
+import { ApiKeyModule } from './modules/api-key/api-key.module'
 import { MailModule } from './modules/mail/mail.module'
 import { MeilisearchModule } from './modules/meilisearch/meilisearch.module'
 import { ScheduledTasksService } from './workers/scheduled-tasks.service'
@@ -70,6 +71,7 @@ import { envValidation } from './config/env.validation'
     AdminModule,
     AgreementModule,
     HealthModule,
+    ApiKeyModule,
   ],
   providers: [ScheduledTasksService],
 })

@@ -1,8 +1,9 @@
-import { Controller, Get, Query, Res } from '@nestjs/common'
+import { Controller, Get, Query, Res, UseGuards } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger'
 import { FastifyReply } from 'fastify'
 import { SearchService } from './search.service'
 import { ProviderService } from '../provider/provider.service'
+import { ApiKeyAuthGuard } from '../api-key/api-key-auth.guard'
 import { CurrentUser } from '../../common/decorators/current-user.decorator'
 import { Public } from '../../common/decorators/public.decorator'
 import { IsString, IsOptional, IsInt, Min, Max } from 'class-validator'
@@ -40,6 +41,7 @@ export class SearchController {
   ) {}
 
   @Public()
+  @UseGuards(ApiKeyAuthGuard)
   @Get()
   @ApiOperation({ summary: '实时搜索资源（聚合多 Provider）' })
   search(@Query() dto: SearchQueryDto, @CurrentUser() user?: { sub: string }) {
@@ -55,6 +57,7 @@ export class SearchController {
   }
 
   @Public()
+  @UseGuards(ApiKeyAuthGuard)
   @Get('fuzzy')
   @ApiOperation({ summary: '模糊搜索（本地 Meilisearch 索引，支持拼音/分词/容错）' })
   fuzzy(@Query() dto: SearchQueryDto) {
@@ -62,6 +65,7 @@ export class SearchController {
   }
 
   @Public()
+  @UseGuards(ApiKeyAuthGuard)
   @Get('combined')
   @ApiOperation({ summary: '组合搜索（实时 + 模糊索引合并去重）' })
   async combined(@Query() dto: SearchQueryDto, @CurrentUser() user?: { sub: string }) {
@@ -103,6 +107,7 @@ export class SearchController {
   }
 
   @Public()
+  @UseGuards(ApiKeyAuthGuard)
   @Get('stream')
   @ApiOperation({ summary: '流式搜索（SSE，Provider 完成即推送）' })
   async stream(@Query() dto: SearchQueryDto, @Res() reply: FastifyReply) {

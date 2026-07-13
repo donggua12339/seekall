@@ -103,6 +103,7 @@ model User {
   takedownRecords    TakedownRecord[]
   adminLogs          AdminAuditLog[]      @relation("AdminAuditLogAdmin")
   userAgreements     UserAgreement[]
+  apiKeys            ApiKey[]
 
   @@index([status])
   @@index([isPaid])
@@ -305,4 +306,23 @@ model AdminAuditLog {
   @@index([adminId, createdAt])
   @@index([targetType, targetId])
   @@map("admin_audit_logs")
+}
+
+// ====== API Key（v0.2 API 开放）======
+
+model ApiKey {
+  id          BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  userId      BigInt    @map("user_id") @db.UnsignedBigInt
+  keyHash     String    @unique @map("key_hash") @db.VarChar(128)
+  name        String    @db.VarChar(64) // 用户自定义名称
+  prefix      String    @db.VarChar(16) // sk_前8位，用于展示识别
+  lastUsedAt  DateTime? @map("last_used_at")
+  revokedAt   DateTime? @map("revoked_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([keyHash])
+  @@map("api_keys")
 }
