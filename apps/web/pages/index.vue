@@ -78,10 +78,7 @@
             size="small"
             class="cursor-pointer mr-2 mb-2"
             round
-            @click="
-              keyword = kw
-              handleSearch()
-            "
+            @click="keyword = kw; handleSearch()"
           >
             {{ kw }}
           </n-tag>
