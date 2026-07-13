@@ -38,7 +38,6 @@ export class CloudAccountService {
       throw new BusinessException(ErrorCode.PARAM_ERROR, 400, 'Cookie 无效')
     }
 
-    // upsert：每个用户每种网盘只能有一个账号
     const account = await this.prisma.cloudAccount.upsert({
       where: { userId_type: { userId, type } },
       create: { userId, type, cookie, remark, status: 'active' },
@@ -66,7 +65,6 @@ export class CloudAccountService {
 
   /**
    * 转存资源到用户网盘
-   * TODO: 实现各网盘的转存 API 调用
    */
   async transfer(userId: bigint, resourceUrl: string, type: string) {
     if (!this.prisma.isAvailable()) {
@@ -81,24 +79,141 @@ export class CloudAccountService {
       throw new BusinessException(ErrorCode.NOT_FOUND, 404, `未配置 ${type} 网盘账号`)
     }
 
-    // 更新最后使用时间
     await this.prisma.cloudAccount.update({
       where: { id: account.id },
       data: { lastUsedAt: new Date() },
     })
 
-    // TODO: 实现转存逻辑
-    // - quark: 调用夸克网盘 API 转存分享链接
-    // - aliyun: 调用阿里云盘 API
-    // - baidu: 调用百度网盘 API
-    // 需要逆向各网盘 API，有合规风险，暂不实现
+    this.logger.log(`Transfer: user ${userId}, type ${type}, url ${resourceUrl}`)
 
-    this.logger.log(`Transfer requested: user ${userId}, type ${type}, url ${resourceUrl}`)
-
-    return {
-      message: '转存功能开发中，当前仅记录请求',
-      supported: false,
-      url: resourceUrl,
+    switch (type) {
+      case 'quark':
+        return this.transferQuark(resourceUrl, account.cookie)
+      case 'aliyun':
+        return this.transferAliyun(resourceUrl, account.cookie)
+      default:
+        return { message: `${type} 转存开发中`, supported: false }
     }
+  }
+
+  /**
+   * 夸克网盘转存
+   * 逆向 API：token -> detail -> save
+   */
+  private async transferQuark(
+    shareUrl: string,
+    cookie: string,
+  ): Promise<{ message: string; supported: boolean; saved?: number }> {
+    const QUARK_API = 'https://drive-pc.quark.cn/1/clouddrive'
+
+    // 1. 解析 share_id
+    const shareIdMatch = shareUrl.match(/\/s\/([a-zA-Z0-9]+)/)
+    if (!shareIdMatch) {
+      throw new BusinessException(ErrorCode.PARAM_ERROR, 400, '无效的夸克分享链接')
+    }
+    const shareId = shareIdMatch[1]
+
+    // 提取 passcode（如有）
+    const passcodeMatch = shareUrl.match(/[?&]pwd=([a-zA-Z0-9]+)/)
+    const passcode = passcodeMatch ? passcodeMatch[1] : undefined
+
+    const headers: Record<string, string> = {
+      Cookie: cookie,
+      'User-Agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
+      'Content-Type': 'application/json',
+      Referer: 'https://pan.quark.cn/',
+      Origin: 'https://pan.quark.cn',
+    }
+
+    try {
+      // 2. 获取 share token
+      const tokenRes = await fetch(
+        `${QUARK_API}/share/sharepage/token?pr=ucpr&uc_param_str=&__dt=0&__t=${Date.now()}`,
+        {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ share_id: shareId, passcode: passcode || '' }),
+        },
+      )
+      const tokenData = (await tokenRes.json()) as { status: number; data?: { stoken: string }; message?: string }
+      if (tokenData.status !== 200 || !tokenData.data?.stoken) {
+        throw new Error(tokenData.message || '获取 share token 失败（Cookie 可能过期）')
+      }
+      const stoken = tokenData.data.stoken
+
+      // 3. 获取文件列表
+      const detailRes = await fetch(
+        `${QUARK_API}/share/sharepage/detail?pr=ucpr&uc_param_str=&__dt=0&__t=${Date.now()}`,
+        {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            share_id: shareId,
+            stoken,
+            pdir_fid: '0',
+            force: 0,
+            _page: 1,
+            _size: 50,
+          }),
+        },
+      )
+      const detailData = (await detailRes.json()) as {
+        status: number
+        data?: { list: Array<{ fid: string; file_name: string; file_type: number; size: number }> }
+        message?: string
+      }
+      if (detailData.status !== 200 || !detailData.data?.list) {
+        throw new Error(detailData.message || '获取文件列表失败')
+      }
+
+      const files = detailData.data.list
+      if (files.length === 0) {
+        throw new Error('分享中没有文件')
+      }
+
+      // 4. 转存到根目录（fid: 0）
+      const toFid = '0' // 根目录
+      const saveRes = await fetch(
+        `${QUARK_API}/file/save/files?pr=ucpr&uc_param_str=&__dt=0&__t=${Date.now()}`,
+        {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            fid_list: files.map((f) => f.fid),
+            fid_token: stoken,
+            to_fid: toFid,
+            pwd_id: shareId,
+            pdir_fid: '0',
+          }),
+        },
+      )
+      const saveData = (await saveRes.json()) as { status: number; message?: string }
+      if (saveData.status !== 200) {
+        throw new Error(saveData.message || '转存失败')
+      }
+
+      this.logger.log(`Quark transfer success: ${files.length} files from ${shareId}`)
+      return {
+        message: `转存成功，共 ${files.length} 个文件`,
+        supported: true,
+        saved: files.length,
+      }
+    } catch (err) {
+      this.logger.error(`Quark transfer failed: ${(err as Error).message}`)
+      throw new BusinessException(ErrorCode.INTERNAL_ERROR, 500, `夸克转存失败: ${(err as Error).message}`)
+    }
+  }
+
+  /**
+   * 阿里云盘转存（TODO）
+   */
+  private async transferAliyun(
+    _shareUrl: string,
+    _cookie: string,
+  ): Promise<{ message: string; supported: boolean }> {
+    // TODO: 逆向阿里云盘 API
+    // 流程类似：refresh_token -> share_link -> save_to_drive
+    return { message: '阿里云盘转存开发中', supported: false }
   }
 }
