@@ -7,6 +7,7 @@ import {
   Logger,
 } from '@nestjs/common'
 import { FastifyReply, FastifyRequest } from 'fastify'
+import * as Sentry from '@sentry/node'
 import { ErrorCode, getErrorMessage } from '../constants/error-codes'
 
 export class BusinessException extends Error {
@@ -63,6 +64,15 @@ export class HttpExceptionFilter implements ExceptionFilter {
         `${request.method} ${request.url} ${statusCode} - ${message}`,
         exception instanceof Error ? exception.stack : undefined,
       )
+      // 上报到 Sentry（5xx 错误）
+      Sentry.captureException(exception, {
+        tags: { statusCode, code },
+        extra: {
+          method: request.method,
+          url: request.url,
+          message,
+        },
+      })
     }
 
     response.status(statusCode).send({

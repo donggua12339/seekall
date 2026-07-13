@@ -1,14 +1,20 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
+import * as Sentry from '@sentry/node'
 import { LinkCheckerService } from '../modules/link-checker/link-checker.service'
+import { SearchService } from '../modules/search/search.service'
+import { HealthService } from '../modules/health/health.service'
 import { PrismaService } from '../database/prisma.service'
 
 @Injectable()
 export class ScheduledTasksService {
   private readonly logger = new Logger(ScheduledTasksService.name)
+  private healthCheckFailures = 0
 
   constructor(
     private readonly linkCheckerService: LinkCheckerService,
+    private readonly searchService: SearchService,
+    private readonly healthService: HealthService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -23,6 +29,63 @@ export class ScheduledTasksService {
       this.logger.log('Scheduled link check completed')
     } catch (err) {
       this.logger.error(`Scheduled link check failed: ${(err as Error).message}`)
+      Sentry.captureException(err, { tags: { task: 'link-check' } })
+    }
+  }
+
+  /**
+   * 每 5 分钟健康检查告警
+   * 连续 3 次失败上报 Sentry
+   */
+  @Cron('*/5 * * * *')
+  async healthCheck() {
+    try {
+      const result = await this.healthService.check()
+      if (result.status === 'ok') {
+        if (this.healthCheckFailures > 0) {
+          this.logger.log(`Services recovered after ${this.healthCheckFailures} failures`)
+        }
+        this.healthCheckFailures = 0
+        return
+      }
+
+      // degraded 或有服务异常
+      this.healthCheckFailures++
+      this.logger.warn(
+        `Health check degraded (${this.healthCheckFailures}): ${JSON.stringify(result.services)}`,
+      )
+
+      // 连续 3 次失败上报 Sentry
+      if (this.healthCheckFailures >= 3) {
+        Sentry.captureMessage(
+          `Services degraded: ${JSON.stringify(result.services)}`,
+          'warning',
+        )
+      }
+    } catch (err) {
+      this.healthCheckFailures++
+      this.logger.error(`Health check failed: ${(err as Error).message}`)
+      if (this.healthCheckFailures >= 3) {
+        Sentry.captureException(err, { tags: { task: 'health-check' } })
+      }
+    }
+  }
+
+  /**
+   * 每小时整点预热热门搜索关键词
+   * 从最近 7 天搜索日志统计 top 20，预缓存结果
+   */
+  @Cron(CronExpression.EVERY_HOUR)
+  async warmupPopularSearches() {
+    try {
+      const result = await this.searchService.warmupPopularKeywords(20)
+      if (result.total > 0) {
+        this.logger.log(
+          `Popular search warmup: ${result.succeeded}/${result.total} succeeded`,
+        )
+      }
+    } catch (err) {
+      this.logger.error(`Popular search warmup failed: ${(err as Error).message}`)
     }
   }
 

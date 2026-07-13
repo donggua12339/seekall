@@ -60,6 +60,35 @@ export class SearchHistoryService {
     return { message: '已清空搜索历史' }
   }
 
+  /**
+   * 热门搜索关键词（从 search_logs 统计，而非 search_history）
+   * 公开接口，无需登录
+   */
+  async popular(limit: number = 10) {
+    if (!this.prisma.isAvailable()) {
+      return { list: [] }
+    }
+
+    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+    const result = await this.prisma.searchLog.groupBy({
+      by: ['query'],
+      where: {
+        createdAt: { gte: since },
+        query: { not: '' },
+      },
+      _count: { query: true },
+      orderBy: { _count: { query: 'desc' } },
+      take: limit,
+    })
+
+    return {
+      list: result.map((item) => ({
+        query: item.query,
+        count: item._count.query,
+      })),
+    }
+  }
+
   private async getLimit(userId: bigint): Promise<number> {
     const user = await this.prisma.user.findUnique({ where: { id: userId } })
     if (!user) return 50

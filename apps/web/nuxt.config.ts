@@ -41,7 +41,21 @@ export default defineNuxtConfig({
     '@unocss/nuxt',
     'nuxtjs-naive-ui',
     '@nuxtjs/color-mode',
+    // Sentry 模块（SENTRY_DSN 为空时自动跳过）
+    '@sentry/nuxt',
   ],
+
+  // Sentry 配置
+  sentry: {
+    dsn: process.env.NUXT_PUBLIC_SENTRY_DSN || '',
+    environment: process.env.NODE_ENV || 'development',
+    release: process.env.APP_VERSION || '0.1.0',
+    tracesSampleRate: Number(process.env.SENTRY_TRACES_SAMPLE_RATE || 0.1),
+    clientConfig: {
+      // 前端错误采样率
+      sampleRate: 1.0,
+    },
+  },
 
   colorMode: {
     preference: 'auto',

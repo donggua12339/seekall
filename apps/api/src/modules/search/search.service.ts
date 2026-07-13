@@ -303,4 +303,59 @@ export class SearchService {
       this.logger.debug(`Log search failed: ${(err as Error).message}`)
     }
   }
+
+  /**
+   * 热门搜索预热 - 从搜索日志统计热门关键词并预缓存
+   * 由定时任务调用，不写日志避免循环
+   */
+  async warmupPopularKeywords(limit: number = 20): Promise<{
+    total: number
+    succeeded: number
+    failed: number
+  }> {
+    if (!this.prisma.isAvailable()) {
+      return { total: 0, succeeded: 0, failed: 0 }
+    }
+
+    // 统计最近 7 天 top N 热门关键词
+    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+    const popular = await this.prisma.searchLog.groupBy({
+      by: ['query'],
+      where: {
+        createdAt: { gte: since },
+        query: { not: '' },
+      },
+      _count: { query: true },
+      orderBy: { _count: { query: 'desc' } },
+      take: limit,
+    })
+
+    this.logger.log(`Warming up ${popular.length} popular keywords...`)
+
+    let succeeded = 0
+    let failed = 0
+
+    for (const item of popular) {
+      try {
+        // 调用 search 但不写日志（userId 传 null，但 logSearch 仍会记录）
+        // 这里用内部方法避免循环
+        const result = await this.search(
+          { keyword: item.query, page: 1, pageSize: 20 },
+          null,
+        )
+        if (result.total > 0) {
+          succeeded++
+          this.logger.debug(`Warmed up "${item.query}": ${result.total} results`)
+        } else {
+          failed++
+        }
+      } catch (err) {
+        failed++
+        this.logger.debug(`Warmup "${item.query}" failed: ${(err as Error).message}`)
+      }
+    }
+
+    this.logger.log(`Warmup completed: ${succeeded} succeeded, ${failed} failed`)
+    return { total: popular.length, succeeded, failed }
+  }
 }

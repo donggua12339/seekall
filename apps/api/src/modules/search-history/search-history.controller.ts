@@ -2,11 +2,16 @@ import { Controller, Get, Delete, Param, ParseIntPipe, Query } from '@nestjs/com
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger'
 import { SearchHistoryService } from './search-history.service'
 import { CurrentUser } from '../../common/decorators/current-user.decorator'
+import { Public } from '../../common/decorators/public.decorator'
 import { IsInt, Min, Max } from 'class-validator'
 
 class ListDto {
   @IsInt() @Min(1) page: number = 1
   @IsInt() @Min(1) @Max(100) pageSize: number = 20
+}
+
+class PopularDto {
+  @IsInt() @Min(1) @Max(50) limit: number = 10
 }
 
 @ApiTags('搜索历史')
@@ -19,6 +24,13 @@ export class SearchHistoryController {
   @ApiOperation({ summary: '搜索历史列表（免费 50 条 / 付费 500 条）' })
   list(@CurrentUser('sub') userId: string, @Query() dto: ListDto) {
     return this.service.list(BigInt(userId), dto.page, dto.pageSize)
+  }
+
+  @Public()
+  @Get('popular')
+  @ApiOperation({ summary: '热门搜索关键词（公开，从搜索日志统计）' })
+  popular(@Query() dto: PopularDto) {
+    return this.service.popular(dto.limit)
   }
 
   @Delete(':id')
