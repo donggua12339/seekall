@@ -1,0 +1,91 @@
+# 觅源 SeekAll - Caddy 配置
+# 主域名：seekall.winmelon.cn
+# 后台子域名：admin.seekall.winmelon.cn
+
+# ---------- 主站 ----------
+seekall.winmelon.cn {
+    # API 接口
+    handle /api/* {
+        reverse_proxy seekall-api:3000 {
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    # Swagger 文档（仅 dev/staging 开放，prod 关闭由后端控制）
+    handle /docs {
+        reverse_proxy seekall-api:3000
+    }
+    handle /docs-json {
+        reverse_proxy seekall-api:3000
+    }
+
+    # 健康检查
+    handle /api/v1/health {
+        reverse_proxy seekall-api:3000
+    }
+
+    # 前端 SSR（Nuxt 3）
+    handle {
+        reverse_proxy seekall-web:3000 {
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    # 安全头
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy strict-origin-when-cross-origin
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        Permissions-Policy "geolocation=(), microphone=(), camera=()"
+        Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none';"
+        -Server
+    }
+
+    # gzip 压缩
+    encode gzip zstd
+
+    # 日志
+    log {
+        output file /var/log/caddy/seekall.log {
+            roll_size 100mb
+            roll_keep 7
+            roll_keep_for 30d
+        }
+        format json
+    }
+}
+
+# ---------- 后台管理子域名 ----------
+admin.seekall.winmelon.cn {
+    # 后台管理 SPA 路由（由 Nuxt 3 前端处理 /admin/* 路径）
+    reverse_proxy seekall-web:3000 {
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+        header_up X-Admin-Path true
+    }
+
+    # 安全头
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy strict-origin-when-cross-origin
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        -Server
+    }
+
+    encode gzip zstd
+
+    log {
+        output file /var/log/caddy/admin.log {
+            roll_size 50mb
+            roll_keep 7
+        }
+        format json
+    }
+}

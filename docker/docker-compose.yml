@@ -1,0 +1,137 @@
+version: '3.9'
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: seekall-caddy
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy/data:/data
+      - ./caddy/config:/config
+      - ./logs/caddy:/var/log/caddy
+    depends_on:
+      - seekall-api
+      - seekall-web
+    networks:
+      - seekall-net
+
+  seekall-api:
+    build:
+      context: ../apps/api
+      dockerfile: Dockerfile
+    container_name: seekall-api
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    healthcheck:
+      test: ['CMD', 'wget', '--spider', '-q', 'http://localhost:3000/api/v1/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      meilisearch:
+        condition: service_started
+    networks:
+      - seekall-net
+
+  seekall-web:
+    build:
+      context: ../apps/web
+      dockerfile: Dockerfile
+    container_name: seekall-web
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    environment:
+      - NODE_ENV=production
+      - NUXT_HOST=0.0.0.0
+      - NUXT_PORT=3000
+      - NUXT_PUBLIC_API_BASE=http://seekall-api:3000
+    healthcheck:
+      test: ['CMD', 'wget', '--spider', '-q', 'http://localhost:3000/api/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      - seekall-api
+    networks:
+      - seekall-net
+
+  mysql:
+    image: mysql:8.0
+    container_name: seekall-mysql
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - ./mysql/data:/var/lib/mysql
+      - ./mysql/init:/docker-entrypoint-initdb.d:ro
+      - ./mysql/conf.d:/etc/mysql/conf.d:ro
+      - ./backups/mysql:/backups
+    ports:
+      - '127.0.0.1:3306:3306'
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-u', 'root', '-p${MYSQL_ROOT_PASSWORD}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - seekall-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: seekall-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - ./redis/data:/data
+    ports:
+      - '127.0.0.1:6379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - seekall-net
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.6
+    container_name: seekall-meilisearch
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    environment:
+      - MEILI_MASTER_KEY=${MEILISEARCH_MASTER_KEY}
+      - MEILI_ENV=production
+      - MEILI_NO_ANALYTICS=true
+    volumes:
+      - ./meilisearch/data:/meili_data
+    ports:
+      - '127.0.0.1:7700:7700'
+    networks:
+      - seekall-net
+
+networks:
+  seekall-net:
+    driver: bridge

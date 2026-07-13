@@ -1,0 +1,75 @@
+import { NestFactory } from '@nestjs/core'
+import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify'
+import { ValidationPipe, Logger } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
+import fastifyCookie from '@fastify/cookie'
+import fastifyHelmet from '@fastify/helmet'
+import { AppModule } from './app.module'
+import { HttpExceptionFilter } from './common/filters/http-exception.filter'
+import { ResponseInterceptor } from './common/interceptors/response.interceptor'
+
+// BigInt 序列化支持（Prisma 返回 BigInt，JSON.stringify 默认不支持）
+;(BigInt.prototype as unknown as { toJSON: () => string }).toJSON = function () {
+  return (this as unknown as bigint).toString()
+}
+
+async function bootstrap() {
+  const logger = new Logger('Bootstrap')
+  const app = await NestFactory.create<NestFastifyApplication>(
+    AppModule,
+    new FastifyAdapter({ trustProxy: true, bodyLimit: 1024 * 1024 * 2 }),
+  )
+
+  const configService = app.get(ConfigService)
+
+  // 全局前缀
+  app.setGlobalPrefix('api/v1')
+
+  // CORS
+  app.enableCors({
+    origin: configService.get<string>('CORS_ORIGINS', '').split(',').filter(Boolean),
+    credentials: true,
+  })
+
+  // Fastify 插件
+  await app.register(fastifyCookie as never, {
+    secret: configService.get<string>('JWT_REFRESH_SECRET'),
+  })
+  await app.register(fastifyHelmet as never)
+
+  // 全局管道
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+      transformOptions: { enableImplicitConversion: true },
+    }),
+  )
+
+  // 全局过滤器 & 拦截器
+  app.useGlobalFilters(new HttpExceptionFilter())
+  app.useGlobalInterceptors(new ResponseInterceptor())
+
+  // Swagger（仅 dev/staging）
+  if (configService.get<string>('SWAGGER_ENABLED', 'true') === 'true') {
+    const config = new DocumentBuilder()
+      .setTitle('SeekAll API')
+      .setDescription('觅源 SeekAll - 全网资源聚合搜索引擎 API 文档')
+      .setVersion('0.1.0')
+      .setLicense('AGPL-3.0', 'https://www.gnu.org/licenses/agpl-3.0.html')
+      .addBearerAuth()
+      .build()
+    const document = SwaggerModule.createDocument(app, config)
+    SwaggerModule.setup('docs', app, document)
+    logger.log('Swagger docs available at /docs')
+  }
+
+  // 启动
+  const port = configService.get<number>('PORT', 3000)
+  await app.listen(port, '0.0.0.0')
+  logger.log(`SeekAll API running on port ${port}`)
+}
+
+bootstrap()

@@ -1,0 +1,42 @@
+{
+  "name": "@seekall/web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SeekAll Web - Nuxt 3 SSR frontend",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare",
+    "lint": "eslint . --fix",
+    "format": "prettier --write \"**/*.{ts,vue,js,json,css}\"",
+    "typecheck": "nuxt typecheck"
+  },
+  "dependencies": {
+    "@pinia/nuxt": "^0.5.0",
+    "@vueuse/nuxt": "^10.7.0",
+    "nuxt": "^3.10.0",
+    "pinia": "^2.1.0",
+    "unocss": "^66.7.5",
+    "vue": "^3.4.0",
+    "vue-router": "^4.2.0"
+  },
+  "devDependencies": {
+    "@nuxtjs/color-mode": "^3.3.0",
+    "@typescript-eslint/eslint-plugin": "^6.19.0",
+    "@typescript-eslint/parser": "^6.19.0",
+    "@unocss/nuxt": "^0.58.0",
+    "@vue/eslint-config-prettier": "^9.0.0",
+    "@vue/eslint-config-typescript": "^12.0.0",
+    "eslint": "^8.56.0",
+    "eslint-plugin-vue": "^9.21.0",
+    "naive-ui": "^2.38.0",
+    "nuxtjs-naive-ui": "^1.0.2",
+    "prettier": "^3.0.0",
+    "typescript": "^5.4.0",
+    "vue-tsc": "^1.8.0"
+  }
+}

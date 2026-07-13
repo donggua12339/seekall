@@ -1,0 +1,304 @@
+// 觅源 SeekAll - Prisma Schema
+// 数据库：MySQL 8
+// 命名约定：snake_case 复数表名
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ====== 枚举 ======
+
+enum UserRole {
+  super_admin
+  user
+}
+
+enum UserStatus {
+  pending_verification
+  active
+  banned
+  deleted
+}
+
+enum InviteCodeStatus {
+  unused
+  used
+  disabled
+}
+
+enum MembershipCodeStatus {
+  unused
+  used
+  disabled
+}
+
+enum ProviderCategory {
+  netdisk
+  magnet
+  tg
+  forum
+}
+
+enum LinkStatusEnum {
+  unknown
+  active
+  dead
+  checking
+}
+
+enum TakedownStatus {
+  pending
+  resolved
+  rejected
+}
+
+enum SearchLogSource {
+  web
+  api
+  admin
+}
+
+// ====== 用户系统 ======
+
+model User {
+  id                 BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  username           String    @unique @db.VarChar(32)
+  email              String    @unique @db.VarChar(128)
+  passwordHash       String    @map("password_hash") @db.VarChar(255)
+  role               UserRole  @default(user)
+  isPaid             Boolean   @default(false) @map("is_paid")
+  paidUntil          DateTime? @map("paid_until")
+  status             UserStatus @default(pending_verification)
+  bannedReason       String?   @map("banned_reason") @db.VarChar(255)
+  badge              String?   @db.VarChar(64)
+  avatarUrl          String?   @map("avatar_url") @db.VarChar(255)
+  bio                String?   @db.VarChar(200)
+  emailVerifyToken   String?   @map("email_verify_token") @db.VarChar(64)
+  emailVerifiedAt    DateTime? @map("email_verified_at")
+  passwordResetToken String?   @map("password_reset_token") @db.VarChar(64)
+  passwordResetExpires DateTime? @map("password_reset_expires")
+  lastLoginAt        DateTime? @map("last_login_at")
+  deletedAt          DateTime? @map("deleted_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  // 关系
+  preferences        UserPreference?
+  inviteCodeUsed     InviteCode?          @relation("InviteCodeUsedBy")
+  membershipCodesUsed MembershipCode[]    @relation("MembershipCodeUsedBy")
+  membershipCodesCreated MembershipCode[] @relation("MembershipCodeCreatedBy")
+  inviteCodesCreated InviteCode[]         @relation("InviteCodeCreatedBy")
+  blockedKeywordsCreated BlockedKeyword[]
+  searchHistory      SearchHistory[]
+  favorites          Favorite[]
+  searchLogs         SearchLog[]
+  takedownRecords    TakedownRecord[]
+  adminLogs          AdminAuditLog[]      @relation("AdminAuditLogAdmin")
+  userAgreements     UserAgreement[]
+
+  @@index([status])
+  @@index([isPaid])
+  @@index([deletedAt])
+  @@map("users")
+}
+
+model UserPreference {
+  userId              BigInt   @id @db.UnsignedBigInt
+  preferredCategories Json?    @map("preferred_categories")
+  preferredProviders  Json?    @map("preferred_providers")
+  theme               String   @default("auto") @db.VarChar(16)
+  language            String   @default("zh-CN") @db.VarChar(10)
+  searchPageSize      Int      @default(20) @map("search_page_size")
+  safeSearch          Boolean  @default(true) @map("safe_search")
+
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_preferences")
+}
+
+// ====== 邀请码 & 会员激活码 ======
+
+model InviteCode {
+  id          BigInt           @id @default(autoincrement()) @db.UnsignedBigInt
+  code        String           @unique @db.VarChar(8)
+  status      InviteCodeStatus @default(unused)
+  createdById BigInt           @map("created_by_id") @db.UnsignedBigInt
+  usedById    BigInt?          @unique @map("used_by_id") @db.UnsignedBigInt
+  usedAt      DateTime?        @map("used_at")
+  expiresAt   DateTime?        @map("expires_at")
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  createdBy   User             @relation("InviteCodeCreatedBy", fields: [createdById], references: [id])
+  usedBy      User?            @relation("InviteCodeUsedBy", fields: [usedById], references: [id])
+
+  @@index([status])
+  @@index([createdById])
+  @@map("invite_codes")
+}
+
+model MembershipCode {
+  id           BigInt              @id @default(autoincrement()) @db.UnsignedBigInt
+  code         String              @unique @db.VarChar(16)
+  status       MembershipCodeStatus @default(unused)
+  durationDays Int                 @map("duration_days")
+  createdById  BigInt              @map("created_by_id") @db.UnsignedBigInt
+  usedById     BigInt?             @map("used_by_id") @db.UnsignedBigInt
+  usedAt       DateTime?           @map("used_at")
+  expiresAt    DateTime?           @map("expires_at")
+  createdAt    DateTime            @default(now()) @map("created_at")
+
+  createdBy    User                @relation("MembershipCodeCreatedBy", fields: [createdById], references: [id])
+  usedBy       User?               @relation("MembershipCodeUsedBy", fields: [usedById], references: [id])
+
+  @@index([status])
+  @@index([createdById])
+  @@map("membership_codes")
+}
+
+// ====== 搜索相关 ======
+
+model SearchHistory {
+  id          BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  userId      BigInt   @map("user_id") @db.UnsignedBigInt
+  query       String   @db.VarChar(255)
+  filters     Json?
+  resultCount Int      @default(0) @map("result_count")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("search_history")
+}
+
+model SearchLog {
+  id          BigInt          @id @default(autoincrement()) @db.UnsignedBigInt
+  userId      BigInt?         @map("user_id") @db.UnsignedBigInt
+  query       String          @db.VarChar(255)
+  filters     Json?
+  resultCount Int             @default(0) @map("result_count")
+  source      SearchLogSource @default(web)
+  durationMs  Int             @map("duration_ms")
+  createdAt   DateTime        @default(now()) @map("created_at")
+
+  user        User?           @relation(fields: [userId], references: [id])
+
+  @@index([createdAt])
+  @@index([userId])
+  @@map("search_logs")
+}
+
+model Favorite {
+  id           BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  userId       BigInt   @map("user_id") @db.UnsignedBigInt
+  resourceUrl  String   @map("resource_url") @db.VarChar(512)
+  title        String   @db.VarChar(255)
+  source       String   @db.VarChar(64)
+  category     String?  @db.VarChar(32)
+  resourceMeta Json?    @map("resource_meta")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, resourceUrl])
+  @@index([userId, createdAt])
+  @@map("favorites")
+}
+
+// ====== 失效链接检测 ======
+
+model LinkStatusRecord {
+  id            BigInt         @id @default(autoincrement()) @db.UnsignedBigInt
+  urlHash       String         @unique @map("url_hash") @db.VarChar(32)
+  url           String         @db.VarChar(512)
+  status        LinkStatusEnum @default(unknown)
+  lastCheckedAt DateTime?      @map("last_checked_at")
+  failCount     Int            @default(0) @map("fail_count")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([lastCheckedAt])
+  @@map("link_status")
+}
+
+// ====== 合规相关 ======
+
+model TakedownRecord {
+  id            BigInt         @id @default(autoincrement()) @db.UnsignedBigInt
+  reporterEmail String         @map("reporter_email") @db.VarChar(128)
+  resourceUrl   String         @map("resource_url") @db.VarChar(512)
+  reason        String         @db.Text
+  status        TakedownStatus @default(pending)
+  resolvedAt    DateTime?      @map("resolved_at")
+  resolvedById  BigInt?        @map("resolved_by_id") @db.UnsignedBigInt
+  createdAt     DateTime       @default(now()) @map("created_at")
+
+  resolvedBy    User?          @relation(fields: [resolvedById], references: [id])
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("takedown_records")
+}
+
+model BlockedKeyword {
+  id          BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  keyword     String   @unique @db.VarChar(128)
+  category    String?  @db.VarChar(32)
+  createdById BigInt   @map("created_by_id") @db.UnsignedBigInt
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  createdBy   User     @relation(fields: [createdById], references: [id])
+
+  @@index([category])
+  @@map("blocked_keywords")
+}
+
+model Agreement {
+  id            BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  version       String   @unique @db.VarChar(16)
+  content       String   @db.LongText
+  effectiveDate DateTime @map("effective_date")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  userAgreements UserAgreement[]
+
+  @@map("agreements")
+}
+
+model UserAgreement {
+  id               BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  userId           BigInt   @map("user_id") @db.UnsignedBigInt
+  agreementVersion String   @map("agreement_version") @db.VarChar(16)
+  agreedAt         DateTime @default(now()) @map("agreed_at")
+
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agreement        Agreement @relation(fields: [agreementVersion], references: [version])
+
+  @@index([userId])
+  @@map("user_agreements")
+}
+
+// ====== 管理员审计 ======
+
+model AdminAuditLog {
+  id         BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  adminId    BigInt   @map("admin_id") @db.UnsignedBigInt
+  action     String   @db.VarChar(64)
+  targetType String   @map("target_type") @db.VarChar(32)
+  targetId   BigInt?  @map("target_id") @db.UnsignedBigInt
+  detail     Json?
+  ip         String?  @db.VarChar(45)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  admin      User     @relation("AdminAuditLogAdmin", fields: [adminId], references: [id])
+
+  @@index([adminId, createdAt])
+  @@index([targetType, targetId])
+  @@map("admin_audit_logs")
+}
