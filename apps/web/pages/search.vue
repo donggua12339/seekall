@@ -8,7 +8,8 @@
         <n-input
           v-model:value="keyword"
           size="large"
-          placeholder="输入关键词..."
+          placeholder="输入关键词...（按 / 快速聚焦）"
+          class="search-keyword"
           clearable
           @keyup.enter="doSearch"
         />
@@ -16,19 +17,38 @@
       </n-input-group>
     </div>
 
-    <!-- 搜索模式切换 -->
+    <!-- 搜索模式切换 + 排序 -->
     <div class="mb-6 flex items-center gap-2 flex-wrap">
       <n-radio-group v-model:value="searchMode" size="small" @update:value="doSearch">
         <n-radio-button value="live">实时搜索</n-radio-button>
         <n-radio-button value="fuzzy">模糊搜索</n-radio-button>
         <n-radio-button value="combined">组合搜索</n-radio-button>
       </n-radio-group>
+
+      <!-- 排序 -->
+      <n-select
+        v-model:value="sortBy"
+        size="small"
+        :options="sortOptions"
+        style="width: 140px"
+        @update:value="doSearch"
+      />
+
+      <!-- 网盘类型过滤 -->
+      <n-select
+        v-model:value="fileTypeFilter"
+        size="small"
+        :options="fileTypeOptions"
+        placeholder="全部类型"
+        clearable
+        style="width: 140px"
+        @update:value="doSearch"
+      />
+
       <span class="text-xs text-gray-400">
-        <template v-if="searchMode === 'live'">多源并发聚合，结果最新</template>
-        <template v-else-if="searchMode === 'fuzzy'"
-          >本地索引，支持拼音/分词/容错，速度极快</template
-        >
-        <template v-else>实时 + 索引合并去重，召回率最高</template>
+        <template v-if="searchMode === 'live'">多源并发聚合</template>
+        <template v-else-if="searchMode === 'fuzzy'">本地索引，极速</template>
+        <template v-else>实时 + 索引合并</template>
       </span>
     </div>
 
@@ -152,9 +172,10 @@ import {
   NRadioGroup,
   NIcon,
   NSpace,
+  NSelect,
   useMessage,
 } from 'naive-ui'
-import { ref, computed, watch, onMounted, h } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, h } from 'vue'
 
 interface SearchResultItem {
   title: string
@@ -203,6 +224,29 @@ const result = ref<SearchResponse | null>(null)
 const searchMode = ref<'live' | 'fuzzy' | 'combined'>(
   (route.query.mode as 'live' | 'fuzzy' | 'combined') || 'live',
 )
+const sortBy = ref<string>((route.query.sort as string) || 'relevance')
+const fileTypeFilter = ref<string | null>(
+  (route.query.fileType as string) || null,
+)
+
+// 排序选项
+const sortOptions = [
+  { label: '相关度', value: 'relevance' },
+  { label: '最新', value: 'time' },
+  { label: '文件大小', value: 'size' },
+  { label: '来源', value: 'source' },
+]
+
+// 网盘类型过滤选项（从搜索结果动态生成）
+const fileTypeOptions = computed(() => {
+  if (!result.value) return []
+  const types = new Set<string>()
+  result.value.list.forEach((item) => {
+    if (item.fileType) types.add(item.fileType)
+    if (item.category) types.add(item.category)
+  })
+  return Array.from(types).map((t) => ({ label: t, value: t }))
+})
 
 const providersTagType = computed<'default' | 'success' | 'info' | 'warning'>(() => {
   if (!result.value) return 'default'
@@ -224,7 +268,13 @@ async function doSearch() {
   // 更新 URL（保留查询历史）
   router.replace({
     path: '/search',
-    query: { q: keyword.value, mode: searchMode.value, page: String(page.value) },
+    query: {
+      q: keyword.value,
+      mode: searchMode.value,
+      sort: sortBy.value,
+      fileType: fileTypeFilter.value || undefined,
+      page: String(page.value),
+    },
   })
 
   try {
@@ -239,6 +289,8 @@ async function doSearch() {
       keyword: keyword.value,
       page: page.value,
       pageSize: pageSize.value,
+      sort: sortBy.value,
+      fileType: fileTypeFilter.value || undefined,
     })
   } catch (err) {
     message.error((err as Error).message || '搜索失败')
@@ -281,10 +333,25 @@ watch(
   },
 )
 
+// 快捷键：/ 聚焦搜索框
+const searchInputRef = ref<InstanceType<typeof NInput> | null>(null)
+function handleKeydown(e: KeyboardEvent) {
+  if (e.key === '/' && document.activeElement?.tagName !== 'INPUT') {
+    e.preventDefault()
+    const input = document.querySelector<HTMLInputElement>('.search-keyword input')
+    input?.focus()
+  }
+}
+
 onMounted(() => {
+  window.addEventListener('keydown', handleKeydown)
   if (keyword.value) {
     doSearch()
   }
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeydown)
 })
 
 function formatSize(bytes: number): string {

@@ -29,6 +29,32 @@ class SearchQueryDto {
   @IsOptional()
   @IsString()
   category?: string
+
+  @ApiProperty({ description: '网盘类型过滤（如 夸克网盘/百度网盘/磁力）', required: false })
+  @IsOptional()
+  @IsString()
+  fileType?: string
+
+  @ApiProperty({
+    description: '排序方式：relevance(默认) / time / size',
+    required: false,
+    default: 'relevance',
+  })
+  @IsOptional()
+  @IsString()
+  sort?: string
+}
+
+class SuggestQueryDto {
+  @ApiProperty({ description: '输入中的关键词' })
+  @IsString()
+  keyword!: string
+
+  @ApiProperty({ description: '返回条数', default: 10 })
+  @IsInt()
+  @Min(1)
+  @Max(20)
+  limit: number = 10
 }
 
 @ApiTags('搜索')
@@ -43,7 +69,7 @@ export class SearchController {
   @Public()
   @UseGuards(ApiKeyAuthGuard)
   @Get()
-  @ApiOperation({ summary: '实时搜索资源（聚合多 Provider）' })
+  @ApiOperation({ summary: '实时搜索资源（聚合多 Provider，支持过滤/排序）' })
   search(@Query() dto: SearchQueryDto, @CurrentUser() user?: { sub: string }) {
     return this.searchService.search(
       {
@@ -51,7 +77,20 @@ export class SearchController {
         page: dto.page,
         pageSize: dto.pageSize,
         category: dto.category,
+        fileType: dto.fileType,
+        sort: dto.sort,
       },
+      user?.sub ? BigInt(user.sub) : null,
+    )
+  }
+
+  @Public()
+  @Get('suggest')
+  @ApiOperation({ summary: '搜索建议（热门词 + 用户历史联想）' })
+  suggest(@Query() dto: SuggestQueryDto, @CurrentUser() user?: { sub: string }) {
+    return this.searchService.suggest(
+      dto.keyword,
+      dto.limit,
       user?.sub ? BigInt(user.sub) : null,
     )
   }

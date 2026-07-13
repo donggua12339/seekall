@@ -14,6 +14,8 @@ export interface SearchRequest {
   page: number
   pageSize: number
   category?: string
+  fileType?: string
+  sort?: string
   filters?: Record<string, unknown>
 }
 
@@ -38,6 +40,12 @@ export interface SearchResultItem {
   fileSize?: number
   fileType?: string
   isDead?: boolean
+  resourceMeta?: {
+    cloudType?: string
+    password?: string | null
+    datetime?: string | null
+    magnetHash?: string | null
+  }
 }
 
 const MEILI_INDEX = 'resources'
@@ -119,11 +127,24 @@ export class SearchService {
     // 过滤失效链接 & takedown 链接（数据库不可用时返回原始结果）
     const filtered = await this.filterInvalidResults(results).catch(() => results)
 
+    // fileType 过滤
+    const typeFiltered = req.fileType
+      ? filtered.filter(
+          (r) =>
+            r.fileType === req.fileType ||
+            r.fileType?.includes(req.fileType!) ||
+            r.category === req.fileType,
+        )
+      : filtered
+
+    // 排序
+    const sorted = this.applySort(typeFiltered, req.sort)
+
     // 分页
-    const total = filtered.length
+    const total = sorted.length
     const totalPages = Math.ceil(total / pageSize)
     const start = (page - 1) * pageSize
-    const list = filtered.slice(start, start + pageSize)
+    const list = sorted.slice(start, start + pageSize)
 
     const response: SearchResponse = {
       list,
@@ -387,5 +408,116 @@ export class SearchService {
 
     this.logger.log(`Warmup completed: ${succeeded} succeeded, ${failed} failed`)
     return { total: popular.length, succeeded, failed }
+  }
+
+  /**
+   * 排序：relevance(默认) / time / size / source
+   */
+  private applySort(
+    results: SearchResultItem[],
+    sort?: string,
+  ): SearchResultItem[] {
+    if (!sort || sort === 'relevance') {
+      return results // 保持 Provider 返回顺序（相关度优先）
+    }
+    const arr = [...results]
+    if (sort === 'time') {
+      arr.sort((a, b) => {
+        const ta = this.extractTime(a) || 0
+        const tb = this.extractTime(b) || 0
+        return tb - ta
+      })
+    } else if (sort === 'size') {
+      arr.sort((a, b) => (b.fileSize || 0) - (a.fileSize || 0))
+    } else if (sort === 'source') {
+      arr.sort((a, b) => a.sourceDisplayName.localeCompare(b.sourceDisplayName))
+    }
+    return arr
+  }
+
+  private extractTime(item: SearchResultItem): number | null {
+    const meta = item.resourceMeta as { datetime?: string | null } | undefined
+    if (!meta?.datetime) return null
+    const t = new Date(meta.datetime).getTime()
+    return isNaN(t) ? null : t
+  }
+
+  /**
+   * 搜索建议 - 热门词 + 用户历史联想
+   */
+  async suggest(
+    keyword: string,
+    limit: number = 10,
+    userId: bigint | null,
+  ): Promise<{ suggestions: string[] }> {
+    if (!keyword || keyword.trim().length < 1) {
+      return { suggestions: [] }
+    }
+
+    const kw = keyword.trim().toLowerCase()
+    const suggestions: string[] = []
+    const seen = new Set<string>()
+
+    // 1. 热门词匹配（Redis ZSET）
+    try {
+      const popular = await this.redis.zrange(POPULARITY_KEY, 0, -1, 'WITHSCORES')
+      for (let i = 0; i < popular.length; i += 2) {
+        const word = popular[i] as string
+        if (word.toLowerCase().includes(kw) && !seen.has(word)) {
+          suggestions.push(word)
+          seen.add(word)
+          if (suggestions.length >= limit) break
+        }
+      }
+    } catch {
+      // Redis 不可用跳过
+    }
+
+    // 2. 用户搜索历史匹配（数据库不可用跳过）
+    if (suggestions.length < limit && userId && this.prisma.isAvailable()) {
+      try {
+        const history = await this.prisma.searchHistory.findMany({
+          where: {
+            userId,
+            query: { contains: kw },
+          },
+          select: { query: true },
+          distinct: ['query'],
+          take: limit * 2,
+        })
+        for (const h of history) {
+          if (!seen.has(h.query)) {
+            suggestions.push(h.query)
+            seen.add(h.query)
+            if (suggestions.length >= limit) break
+          }
+        }
+      } catch {
+        // 数据库不可用跳过
+      }
+    }
+
+    // 3. 兜底：Meilisearch 索引中的标题匹配
+    if (suggestions.length < limit) {
+      try {
+        const meili = this.meilisearchService.getClient()
+        const result = await meili.index(MEILI_INDEX).search(keyword, {
+          limit: 5,
+          attributesToRetrieve: ['title'],
+        })
+        for (const hit of result.hits as Array<{ title: string }>) {
+          const title = hit.title?.slice(0, 60)
+          if (title && !seen.has(title) && title.toLowerCase().includes(kw)) {
+            suggestions.push(title)
+            seen.add(title)
+            if (suggestions.length >= limit) break
+          }
+        }
+      } catch {
+        // Meilisearch 不可用跳过
+      }
+    }
+
+    return { suggestions: suggestions.slice(0, limit) }
   }
 }
