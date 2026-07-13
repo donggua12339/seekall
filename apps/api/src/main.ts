@@ -84,7 +84,7 @@ async function bootstrap() {
   }
 
   // 启动
-  const port = configService.get<number>('PORT', 3000)
+  const port = configService.get<number>('APP_PORT', 7301)
   await app.listen(port, '0.0.0.0')
   logger.log(`SeekAll API running on port ${port}`)
 }

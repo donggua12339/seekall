@@ -25,7 +25,7 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     // 服务端私有
-    apiBase: process.env.NUXT_API_BASE || 'http://localhost:3000',
+    apiBase: process.env.NUXT_API_BASE || 'http://localhost:7301',
     // 公开（前端可用）
     public: {
       apiBase: process.env.NUXT_PUBLIC_API_BASE || '/api/v1',
@@ -84,13 +84,13 @@ export default defineNuxtConfig({
       '/**': { ssr: true },
       // 代理 /api/** 到后端 NestJS（路径完整保留）
       '/api/**': {
-        proxy: `${process.env.NUXT_API_BASE || 'http://localhost:3000'}/api/**`,
+        proxy: `${process.env.NUXT_API_BASE || 'http://localhost:7301'}/api/**`,
       },
       '/docs': {
-        proxy: `${process.env.NUXT_API_BASE || 'http://localhost:3000'}/docs`,
+        proxy: `${process.env.NUXT_API_BASE || 'http://localhost:7301'}/docs`,
       },
       '/docs-json': {
-        proxy: `${process.env.NUXT_API_BASE || 'http://localhost:3000'}/docs-json`,
+        proxy: `${process.env.NUXT_API_BASE || 'http://localhost:7301'}/docs-json`,
       },
     },
   },
