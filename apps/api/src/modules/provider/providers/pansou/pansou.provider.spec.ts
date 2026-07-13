@@ -67,7 +67,7 @@ describe('PansouProvider', () => {
       }
 
       global.fetch = jest.fn().mockResolvedValue({
-        ok: true,
+        ok: true, headers: { get: () => 'application/json' },
         json: () => Promise.resolve(mockResponse),
       }) as unknown as typeof fetch
 
@@ -101,7 +101,7 @@ describe('PansouProvider', () => {
       }
 
       global.fetch = jest.fn().mockResolvedValue({
-        ok: true,
+        ok: true, headers: { get: () => 'application/json' },
         json: () => Promise.resolve(mockResponse),
       }) as unknown as typeof fetch
 
@@ -123,7 +123,7 @@ describe('PansouProvider', () => {
       }
 
       global.fetch = jest.fn().mockResolvedValue({
-        ok: true,
+        ok: true, headers: { get: () => 'application/json' },
         json: () => Promise.resolve(mockResponse),
       }) as unknown as typeof fetch
 
@@ -154,7 +154,7 @@ describe('PansouProvider', () => {
       }
 
       global.fetch = jest.fn().mockResolvedValue({
-        ok: true,
+        ok: true, headers: { get: () => 'application/json' },
         json: () => Promise.resolve(mockResponse),
       }) as unknown as typeof fetch
 
@@ -179,7 +179,7 @@ describe('PansouProvider', () => {
       }
 
       global.fetch = jest.fn().mockResolvedValue({
-        ok: true,
+        ok: true, headers: { get: () => 'application/json' },
         json: () => Promise.resolve(mockResponse),
       }) as unknown as typeof fetch
 
@@ -191,7 +191,7 @@ describe('PansouProvider', () => {
   describe('错误处理', () => {
     it('响应没有 data 字段时返回空数组', async () => {
       global.fetch = jest.fn().mockResolvedValue({
-        ok: true,
+        ok: true, headers: { get: () => 'application/json' },
         json: () => Promise.resolve({ code: 0, message: 'no data' }),
       }) as unknown as typeof fetch
 

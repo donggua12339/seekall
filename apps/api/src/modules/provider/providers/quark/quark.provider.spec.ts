@@ -68,7 +68,7 @@ describe('QuarkProvider', () => {
       }
 
       global.fetch = jest.fn().mockResolvedValue({
-        ok: true,
+        ok: true, headers: { get: () => 'application/json' },
         json: () => Promise.resolve(mockResponse),
       }) as unknown as typeof fetch
 
@@ -96,7 +96,7 @@ describe('QuarkProvider', () => {
       }
 
       global.fetch = jest.fn().mockResolvedValue({
-        ok: true,
+        ok: true, headers: { get: () => 'application/json' },
         json: () => Promise.resolve(mockResponse),
       }) as unknown as typeof fetch
 
@@ -118,7 +118,7 @@ describe('QuarkProvider', () => {
       }
 
       global.fetch = jest.fn().mockResolvedValue({
-        ok: true,
+        ok: true, headers: { get: () => 'application/json' },
         json: () => Promise.resolve(mockResponse),
       }) as unknown as typeof fetch
 
@@ -145,7 +145,7 @@ describe('QuarkProvider', () => {
       }
 
       global.fetch = jest.fn().mockResolvedValue({
-        ok: true,
+        ok: true, headers: { get: () => 'application/json' },
         json: () => Promise.resolve(mockResponse),
       }) as unknown as typeof fetch
 
@@ -176,7 +176,7 @@ describe('QuarkProvider', () => {
 
     it('响应无 data 字段时返回空数组', async () => {
       global.fetch = jest.fn().mockResolvedValue({
-        ok: true,
+        ok: true, headers: { get: () => 'application/json' },
         json: () => Promise.resolve({ code: 0 }),
       }) as unknown as typeof fetch
 

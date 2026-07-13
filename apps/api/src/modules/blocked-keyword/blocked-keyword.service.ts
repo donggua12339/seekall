@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../../database/prisma.service'
+import { BusinessException } from '../../common/filters/http-exception.filter'
+import { ErrorCode } from '../../common/constants/error-codes'
 
 @Injectable()
 export class BlockedKeywordService {
@@ -25,6 +27,10 @@ export class BlockedKeywordService {
   }
 
   async delete(id: bigint) {
+    const keyword = await this.prisma.blockedKeyword.findUnique({ where: { id } })
+    if (!keyword) {
+      throw new BusinessException(ErrorCode.NOT_FOUND, 404)
+    }
     await this.prisma.blockedKeyword.delete({ where: { id } })
     return { message: '已删除' }
   }

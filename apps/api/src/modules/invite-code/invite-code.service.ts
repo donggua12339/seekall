@@ -11,6 +11,9 @@ export class InviteCodeService {
   constructor(private readonly prisma: PrismaService) {}
 
   async generateBatch(count: number, createdById: bigint, expiresAt?: Date) {
+    if (count < 1 || count > 1000) {
+      throw new BusinessException(ErrorCode.PARAM_ERROR, 400, '数量必须在 1-1000 之间')
+    }
     const codes = InviteCodeUtil.generateBatch(count, 8)
     const created = await this.prisma.$transaction(
       codes.map((code) =>
@@ -58,6 +61,9 @@ export class InviteCodeService {
     }
     if (code.status === 'used') {
       throw new BusinessException(ErrorCode.INVITE_CODE_USED)
+    }
+    if (code.status === 'disabled') {
+      throw new BusinessException(ErrorCode.PARAM_ERROR, 400, '邀请码已禁用')
     }
     return this.prisma.inviteCode.update({
       where: { id },

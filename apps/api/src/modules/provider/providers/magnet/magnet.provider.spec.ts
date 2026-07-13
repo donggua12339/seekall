@@ -68,7 +68,7 @@ describe('MagnetProvider', () => {
         </rss>`
 
       global.fetch = jest.fn().mockResolvedValue({
-        ok: true,
+        ok: true, headers: { get: () => 'application/json' },
         text: () => Promise.resolve(mockXml),
       }) as unknown as typeof fetch
 
@@ -99,7 +99,7 @@ describe('MagnetProvider', () => {
         </channel></rss>`
 
       global.fetch = jest.fn().mockResolvedValue({
-        ok: true,
+        ok: true, headers: { get: () => 'application/json' },
         text: () => Promise.resolve(mockXml),
       }) as unknown as typeof fetch
 
@@ -118,7 +118,7 @@ describe('MagnetProvider', () => {
         </channel></rss>`
 
       global.fetch = jest.fn().mockResolvedValue({
-        ok: true,
+        ok: true, headers: { get: () => 'application/json' },
         text: () => Promise.resolve(mockXml),
       }) as unknown as typeof fetch
 
@@ -130,7 +130,7 @@ describe('MagnetProvider', () => {
 
     it('应该处理空 XML', async () => {
       global.fetch = jest.fn().mockResolvedValue({
-        ok: true,
+        ok: true, headers: { get: () => 'application/json' },
         text: () => Promise.resolve('<?xml version="1.0"?><rss></rss>'),
       }) as unknown as typeof fetch
 

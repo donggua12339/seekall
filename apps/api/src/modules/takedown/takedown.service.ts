@@ -1,6 +1,8 @@
 import { Injectable, Logger, Inject } from '@nestjs/common'
 import { PrismaService } from '../../database/prisma.service'
 import { REDIS_CLIENT } from '../../database/redis.module'
+import { BusinessException } from '../../common/filters/http-exception.filter'
+import { ErrorCode } from '../../common/constants/error-codes'
 import type Redis from 'ioredis'
 
 @Injectable()
@@ -17,6 +19,16 @@ export class TakedownService {
     resourceUrl: string
     reason: string
   }) {
+    if (!data.reporterEmail || !data.reporterEmail.trim()) {
+      throw new BusinessException(ErrorCode.PARAM_ERROR, 400, '举报邮箱不能为空')
+    }
+    if (!data.resourceUrl || !data.resourceUrl.trim()) {
+      throw new BusinessException(ErrorCode.PARAM_ERROR, 400, '资源 URL 不能为空')
+    }
+    if (!data.reason || !data.reason.trim()) {
+      throw new BusinessException(ErrorCode.PARAM_ERROR, 400, '举报理由不能为空')
+    }
+
     const record = await this.prisma.takedownRecord.create({
       data: {
         reporterEmail: data.reporterEmail,
@@ -30,6 +42,10 @@ export class TakedownService {
   }
 
   async resolve(id: bigint, resolvedById: bigint, status: 'resolved' | 'rejected') {
+    const existing = await this.prisma.takedownRecord.findUnique({ where: { id } })
+    if (!existing) {
+      throw new BusinessException(ErrorCode.NOT_FOUND, 404)
+    }
     const record = await this.prisma.takedownRecord.update({
       where: { id },
       data: {
