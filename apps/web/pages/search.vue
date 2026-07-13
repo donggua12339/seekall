@@ -127,6 +127,17 @@
           <n-button size="small" @click="goToDetail(item)">详情</n-button>
           <n-button size="small" @click="copyLink(item.url)">复制链接</n-button>
           <n-button size="small" @click="addToFavorite(item)">收藏</n-button>
+
+          <!-- 有效性投票 -->
+          <n-button-group size="small">
+            <n-button @click="voteLink(item.url, 'up')" :loading="votingUrl === item.url">
+              👍 {{ item.voteUp || 0 }}
+            </n-button>
+            <n-button @click="voteLink(item.url, 'down')" :loading="votingUrl === item.url">
+              👎 {{ item.voteDown || 0 }}
+            </n-button>
+          </n-button-group>
+
           <n-button size="small" quaternary type="warning" @click="reportDead(item.url)">
             举报失效
           </n-button>
@@ -164,6 +175,7 @@ import {
   NInput,
   NInputGroup,
   NButton,
+  NButtonGroup,
   NCard,
   NTag,
   NPagination,
@@ -423,6 +435,28 @@ async function reportDead(url: string) {
     message.success('已收到举报，将在下次检测时处理')
   } catch (err) {
     message.error((err as Error).message || '举报失败')
+  }
+}
+
+const votingUrl = ref<string | null>(null)
+
+async function voteLink(url: string, vote: 'up' | 'down') {
+  votingUrl.value = url
+  try {
+    const res = await api.post<{ up: number; down: number }>('/link-checker/vote', { url, vote })
+    message.success(vote === 'up' ? '已标记为有效' : '已标记为失效')
+    // 更新本地数据
+    if (result.value) {
+      const item = result.value.list.find((i) => i.url === url)
+      if (item) {
+        item.voteUp = res.up
+        item.voteDown = res.down
+      }
+    }
+  } catch (err) {
+    message.error((err as Error).message || '投票失败')
+  } finally {
+    votingUrl.value = null
   }
 }
 </script>
