@@ -18,8 +18,17 @@ export default defineNuxtConfig({
         },
         { name: 'referrer', content: 'strict-origin-when-cross-origin' },
         { name: 'robots', content: 'noindex, nofollow' }, // 私人小圈子，不收录
+        // PWA
+        { name: 'theme-color', content: '#6366f1' },
+        { name: 'apple-mobile-web-app-capable', content: 'yes' },
+        { name: 'apple-mobile-web-app-status-bar-style', content: 'default' },
+        { name: 'apple-mobile-web-app-title', content: 'SeekAll' },
       ],
-      link: [{ rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' }],
+      link: [
+        { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
+        { rel: 'manifest', href: '/manifest.json' },
+        { rel: 'apple-touch-icon', href: '/favicon.svg' },
+      ],
     },
   },
 
