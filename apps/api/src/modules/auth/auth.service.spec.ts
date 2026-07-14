@@ -36,6 +36,9 @@ describe('AuthService', () => {
       sadd: jest.fn(),
       srem: jest.fn(),
       smembers: jest.fn().mockResolvedValue([]),
+      hset: jest.fn(),
+      hgetall: jest.fn().mockResolvedValue({}),
+      hdel: jest.fn(),
       expire: jest.fn(),
       multi: jest.fn().mockReturnValue({
         zincrby: jest.fn(),
