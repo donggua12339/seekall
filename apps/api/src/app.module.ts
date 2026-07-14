@@ -22,6 +22,11 @@ import { ApiKeyModule } from './modules/api-key/api-key.module'
 import { MailModule } from './modules/mail/mail.module'
 import { MeilisearchModule } from './modules/meilisearch/meilisearch.module'
 import { CloudAccountModule } from './modules/cloud-account/cloud-account.module'
+import { SubscriptionModule } from './modules/subscription/subscription.module'
+import { RecommendationModule } from './modules/recommendation/recommendation.module'
+import { SubtitleModule } from './modules/subtitle/subtitle.module'
+import { DownloadModule } from './modules/download/download.module'
+import { CollectionModule } from './modules/collection/collection.module'
 import { ScheduledTasksService } from './workers/scheduled-tasks.service'
 import { envValidation } from './config/env.validation'
 
@@ -74,6 +79,11 @@ import { envValidation } from './config/env.validation'
     HealthModule,
     ApiKeyModule,
     CloudAccountModule,
+    SubscriptionModule,
+    RecommendationModule,
+    SubtitleModule,
+    DownloadModule,
+    CollectionModule,
   ],
   providers: [ScheduledTasksService],
 })

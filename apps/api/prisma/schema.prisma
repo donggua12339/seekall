@@ -106,6 +106,8 @@ model User {
   userAgreements     UserAgreement[]
   apiKeys            ApiKey[]
   cloudAccounts      CloudAccount[]
+  subscriptions      Subscription[]
+  collections        Collection[]
 
   @@index([status])
   @@index([isPaid])
@@ -365,4 +367,60 @@ model CloudAccount {
   @@unique([userId, type])
   @@index([userId])
   @@map("cloud_accounts")
+}
+
+// ====== 关键词订阅（通知）======
+
+model Subscription {
+  id             BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  userId         BigInt   @map("user_id") @db.UnsignedBigInt
+  keyword        String   @db.VarChar(100)
+  notifyEmail    Boolean  @default(true) @map("notify_email")
+  lastNotifiedAt DateTime? @map("last_notified_at")
+  lastResultCount Int     @default(0) @map("last_result_count")
+  active          Boolean  @default(true)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, keyword])
+  @@index([active, lastNotifiedAt])
+  @@map("subscriptions")
+}
+
+// ====== 资源合集 ======
+
+model Collection {
+  id          BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  userId      BigInt   @map("user_id") @db.UnsignedBigInt
+  title       String   @db.VarChar(128)
+  description String?  @db.Text
+  coverUrl    String?  @map("cover_url") @db.VarChar(512)
+  isPublic    Boolean  @default(false) @map("is_public")
+  itemCount   Int      @default(0) @map("item_count")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items       CollectionItem[]
+
+  @@index([userId, createdAt])
+  @@index([isPublic])
+  @@map("collections")
+}
+
+model CollectionItem {
+  id          BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  collectionId BigInt  @map("collection_id") @db.UnsignedBigInt
+  resourceUrl String   @map("resource_url") @db.VarChar(512)
+  title       String   @db.VarChar(255)
+  source      String?  @db.VarChar(64)
+  fileType    String?  @db.VarChar(32)
+  addedAt     DateTime @default(now()) @map("added_at")
+
+  collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+
+  @@unique([collectionId, resourceUrl])
+  @@index([collectionId, addedAt])
+  @@map("collection_items")
 }

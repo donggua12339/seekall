@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config'
 import { ProviderService } from '../provider/provider.service'
 import { PrismaService } from '../../database/prisma.service'
 import { MeilisearchService } from '../meilisearch/meilisearch.service'
+import { classifyResource } from '../../common/utils/resource-tagger.util'
 import { REDIS_CLIENT } from '../../database/redis.module'
 import { BusinessException } from '../../common/filters/http-exception.filter'
 import { ErrorCode } from '../../common/constants/error-codes'
@@ -40,6 +41,9 @@ export interface SearchResultItem {
   fileSize?: number
   fileType?: string
   isDead?: boolean
+  tags?: string[]
+  voteUp?: number
+  voteDown?: number
   resourceMeta?: {
     cloudType?: string
     password?: string | null
@@ -127,15 +131,21 @@ export class SearchService {
     // 过滤失效链接 & takedown 链接（数据库不可用时返回原始结果）
     const filtered = await this.filterInvalidResults(results).catch(() => results)
 
+    // AI 资源标签（基于标题规则匹配，自动分类）
+    const tagged = filtered.map((r) => ({
+      ...r,
+      tags: classifyResource(r.title),
+    }))
+
     // fileType 过滤
     const typeFiltered = req.fileType
-      ? filtered.filter(
+      ? tagged.filter(
           (r) =>
             r.fileType === req.fileType ||
             r.fileType?.includes(req.fileType!) ||
             r.category === req.fileType,
         )
-      : filtered
+      : tagged
 
     // 排序
     const sorted = this.applySort(typeFiltered, req.sort)

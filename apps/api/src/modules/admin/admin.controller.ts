@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Patch, Query, Param, ParseIntPipe } from '@nestjs/common'
+import { Body, Controller, Get, Patch, Post, Query, Param, ParseIntPipe } from '@nestjs/common'
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger'
 import { AdminService } from './admin.service'
 import { ProviderService } from '../provider/provider.service'
@@ -18,6 +18,10 @@ class BanDto {
 
 class AnalyticsDto {
   @IsInt() @Min(1) @Max(90) days: number = 7
+}
+
+class ProviderActionDto {
+  @IsString() name!: string
 }
 
 @ApiTags('后台管理（super_admin）')
@@ -43,9 +47,29 @@ export class AdminController {
   }
 
   @Get('provider-stats')
-  @ApiOperation({ summary: 'Provider 健康度评分' })
+  @ApiOperation({ summary: 'Provider 健康度评分（含自动降级状态）' })
   providerStats() {
     return { providers: this.providerService.getStats() }
+  }
+
+  @Post('providers/:name/disable')
+  @ApiOperation({ summary: '手动禁用 Provider' })
+  disableProvider(@Param('name') name: string, @Body() dto: ProviderActionDto) {
+    const ok = this.providerService.disableProvider(name, dto.name || 'manual')
+    return { ok, message: ok ? '已禁用' : '已处于禁用状态' }
+  }
+
+  @Post('providers/:name/enable')
+  @ApiOperation({ summary: '手动恢复 Provider' })
+  enableProvider(@Param('name') name: string) {
+    const ok = this.providerService.enableProvider(name)
+    return { ok, message: ok ? '已恢复' : '该 Provider 未被禁用' }
+  }
+
+  @Post('providers/recover-check')
+  @ApiOperation({ summary: '立即执行 Provider 自动恢复检查' })
+  async recoverProviders() {
+    return this.providerService.autoRecover()
   }
 
   @Get('users')

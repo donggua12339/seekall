@@ -4,6 +4,8 @@ import * as Sentry from '@sentry/node'
 import { LinkCheckerService } from '../modules/link-checker/link-checker.service'
 import { SearchService } from '../modules/search/search.service'
 import { HealthService } from '../modules/health/health.service'
+import { SubscriptionService } from '../modules/subscription/subscription.service'
+import { ProviderService } from '../modules/provider/provider.service'
 import { PrismaService } from '../database/prisma.service'
 
 @Injectable()
@@ -15,6 +17,8 @@ export class ScheduledTasksService {
     private readonly linkCheckerService: LinkCheckerService,
     private readonly searchService: SearchService,
     private readonly healthService: HealthService,
+    private readonly subscriptionService: SubscriptionService,
+    private readonly providerService: ProviderService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -120,6 +124,40 @@ export class ScheduledTasksService {
       this.logger.log(`Cleaned ${result.count} audit logs`)
     } catch (err) {
       this.logger.error(`Clean audit logs failed: ${(err as Error).message}`)
+    }
+  }
+
+  /**
+   * 每 2 小时检查关键词订阅，有新资源则邮件通知
+   */
+  @Cron(process.env.SUBSCRIPTION_CHECK_INTERVAL || '0 */2 * * *')
+  async checkSubscriptions() {
+    this.logger.log('Checking keyword subscriptions...')
+    try {
+      const result = await this.subscriptionService.checkAllSubscriptions()
+      if (result.checked > 0) {
+        this.logger.log(
+          `Subscription check: ${result.checked} checked, ${result.notified} notified, ${result.failed} failed`,
+        )
+      }
+    } catch (err) {
+      this.logger.error(`Subscription check failed: ${(err as Error).message}`)
+      Sentry.captureException(err, { tags: { task: 'subscription-check' } })
+    }
+  }
+
+  /**
+   * 每 10 分钟尝试恢复自动降级的 Provider
+   */
+  @Cron('*/10 * * * *')
+  async autoRecoverProviders() {
+    try {
+      const result = await this.providerService.autoRecover()
+      if (result.recovered.length > 0) {
+        this.logger.log(`Providers auto-recovered: ${result.recovered.join(', ')}`)
+      }
+    } catch (err) {
+      this.logger.error(`Provider auto-recover failed: ${(err as Error).message}`)
     }
   }
 }

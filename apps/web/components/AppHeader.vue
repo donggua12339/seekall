@@ -25,6 +25,13 @@
         </NuxtLink>
         <NuxtLink
           v-if="authStore.isLoggedIn"
+          to="/subscriptions"
+          class="px-3 py-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-sm"
+        >
+          订阅
+        </NuxtLink>
+        <NuxtLink
+          v-if="authStore.isLoggedIn"
           to="/profile"
           class="px-3 py-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-sm"
         >
@@ -37,6 +44,16 @@
         >
           后台
         </NuxtLink>
+
+        <!-- 主题切换 -->
+        <n-button size="small" quaternary @click="toggleTheme" :title="themeToggleTitle">
+          {{ colorMode.preference === 'dark' ? '☀' : '☾' }}
+        </n-button>
+
+        <!-- 快捷键帮助 -->
+        <n-button size="small" quaternary @click="showShortcut = true" title="快捷键 (?)">
+          ?
+        </n-button>
 
         <template v-if="!authStore.isLoggedIn">
           <NuxtLink to="/auth/login">
@@ -51,12 +68,81 @@
         </template>
       </nav>
     </div>
+
+    <ShortcutHelp v-model:show="showShortcut" />
   </header>
 </template>
 
 <script setup lang="ts">
 import { NButton } from 'naive-ui'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from '~/stores/auth'
 
 const authStore = useAuthStore()
+const colorMode = useColorMode()
+const showShortcut = ref(false)
+
+const themeToggleTitle = computed(() =>
+  colorMode.preference === 'dark' ? '切换到亮色' : '切换到暗色',
+)
+
+function toggleTheme() {
+  colorMode.preference = colorMode.preference === 'dark' ? 'light' : 'dark'
+}
+
+// g-prefix 导航快捷键
+let gPressed = false
+let gTimer: ReturnType<typeof setTimeout> | null = null
+
+function handleKeydown(e: KeyboardEvent) {
+  // 在输入框内不触发
+  const tag = (document.activeElement?.tagName || '').toLowerCase()
+  const inInput = tag === 'input' || tag === 'textarea'
+
+  if (e.key === '?' && !inInput) {
+    e.preventDefault()
+    showShortcut.value = true
+    return
+  }
+
+  if (e.key === 'Escape' && showShortcut.value) {
+    showShortcut.value = false
+    return
+  }
+
+  if (inInput) return
+
+  if (e.key === 'g') {
+    gPressed = true
+    if (gTimer) clearTimeout(gTimer)
+    gTimer = setTimeout(() => {
+      gPressed = false
+    }, 700)
+    return
+  }
+
+  if (gPressed) {
+    const map: Record<string, string> = {
+      h: '/',
+      s: '/search',
+      f: '/favorites',
+      u: '/subscriptions',
+    }
+    const target = map[e.key]
+    if (target) {
+      e.preventDefault()
+      navigateTo(target)
+    }
+    gPressed = false
+    if (gTimer) clearTimeout(gTimer)
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', handleKeydown)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeydown)
+})
 </script>

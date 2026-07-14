@@ -1,4 +1,5 @@
 import { Injectable, Logger, Inject } from '@nestjs/common'
+import * as Sentry from '@sentry/node'
 import { Provider, SearchQuery, SearchResult } from './interfaces/provider.interface'
 import { UrlUtil } from '../../common/utils/url.util'
 
@@ -10,12 +11,21 @@ export interface ProviderStats {
   lastSuccessAt: number | null
   lastFailAt: number | null
   score: number // 0-100，综合健康度
+  autoDisabled: boolean
+  autoDisabledAt: number | null
+  autoDisabledReason?: string
 }
+
+// 健康度阈值
+const SCORE_DISABLE_THRESHOLD = 30 // 低于此分自动降级
+const AUTO_DISABLE_MIN_FAILURES = 5 // 至少失败 N 次才触发降级（避免新启动时抖动）
 
 @Injectable()
 export class ProviderService {
   private readonly logger = new Logger(ProviderService.name)
   private readonly stats = new Map<string, ProviderStats>()
+  // 运行时禁用状态（独立于 Provider.enabled 配置项，避免修改 readonly 字段）
+  private readonly disabledAt = new Map<string, { at: number; reason: string }>()
 
   constructor(@Inject('PROVIDERS') private readonly providers: Provider[]) {
     // 初始化每个 Provider 的统计
@@ -28,12 +38,55 @@ export class ProviderService {
         lastSuccessAt: null,
         lastFailAt: null,
         score: 100,
+        autoDisabled: false,
+        autoDisabledAt: null,
       })
     }
   }
 
   getActiveProviders(): Provider[] {
-    return this.providers.filter((p) => p.enabled)
+    return this.providers.filter((p) => p.enabled && !this.disabledAt.has(p.name))
+  }
+
+  /**
+   * 手动/自动禁用 Provider
+   */
+  disableProvider(name: string, reason: string): boolean {
+    if (this.disabledAt.has(name)) return false
+    this.disabledAt.set(name, { at: Date.now(), reason })
+    const s = this.stats.get(name)
+    if (s) {
+      s.autoDisabled = true
+      s.autoDisabledAt = Date.now()
+      s.autoDisabledReason = reason
+    }
+    this.logger.warn(`Provider ${name} auto-disabled: ${reason}`)
+    Sentry.captureMessage(`Provider ${name} auto-disabled: ${reason}`, 'warning')
+    return true
+  }
+
+  /**
+   * 恢复 Provider
+   */
+  enableProvider(name: string): boolean {
+    if (!this.disabledAt.has(name)) return false
+    this.disabledAt.delete(name)
+    const s = this.stats.get(name)
+    if (s) {
+      s.autoDisabled = false
+      s.autoDisabledAt = null
+      s.autoDisabledReason = undefined
+      // 重置统计，避免历史失败拖累评分
+      s.successCount = 0
+      s.failCount = 0
+      s.score = 100
+    }
+    this.logger.log(`Provider ${name} re-enabled`)
+    return true
+  }
+
+  isProviderDisabled(name: string): boolean {
+    return this.disabledAt.has(name)
   }
 
   async searchAll(query: SearchQuery): Promise<{
@@ -105,6 +158,18 @@ export class ProviderService {
     s.failCount++
     s.lastFailAt = Date.now()
     this.recalculateScore(s)
+
+    // 自动降级：分数过低 + 累计失败次数足够 + 尚未被禁用
+    if (
+      !this.disabledAt.has(name) &&
+      s.score < SCORE_DISABLE_THRESHOLD &&
+      s.failCount >= AUTO_DISABLE_MIN_FAILURES
+    ) {
+      this.disableProvider(
+        name,
+        `score=${s.score}, failures=${s.failCount}, avgMs=${s.avgDurationMs}`,
+      )
+    }
   }
 
   /**
@@ -180,6 +245,40 @@ export class ProviderService {
       }),
     )
     return results
+  }
+
+  /**
+   * 自动恢复检查 - 对已自动降级的 Provider 调用 healthCheck
+   * 通过则恢复，未通过则保持禁用
+   * 由定时任务每 10 分钟调用一次
+   */
+  async autoRecover(): Promise<{ recovered: string[]; stillDown: string[] }> {
+    const recovered: string[] = []
+    const stillDown: string[] = []
+
+    for (const p of this.providers) {
+      if (!this.disabledAt.has(p.name)) continue
+      try {
+        const ok = await p.healthCheck()
+        if (ok) {
+          // 健康检查通过，恢复
+          this.enableProvider(p.name)
+          recovered.push(p.name)
+        } else {
+          stillDown.push(p.name)
+        }
+      } catch {
+        stillDown.push(p.name)
+      }
+    }
+
+    if (recovered.length > 0) {
+      this.logger.log(`Providers recovered: ${recovered.join(', ')}`)
+    }
+    if (stillDown.length > 0) {
+      this.logger.debug(`Providers still down: ${stillDown.join(', ')}`)
+    }
+    return { recovered, stillDown }
   }
 
   /**
