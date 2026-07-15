@@ -80,7 +80,7 @@
             size="small"
             class="cursor-pointer mr-2 mb-2"
             round
-            @click="keyword = kw; handleSearch()"
+            @click="searchKeyword(kw)"
           >
             {{ kw }}
           </n-tag>
@@ -120,15 +120,7 @@
 </template>
 
 <script setup lang="ts">
-import {
-  NInput,
-  NInputGroup,
-  NButton,
-  NTag,
-  NRadioButton,
-  NRadioGroup,
-  NAutoComplete,
-} from 'naive-ui'
+import { NInputGroup, NButton, NTag, NRadioButton, NRadioGroup, NAutoComplete } from 'naive-ui'
 import { ref, onMounted, onUnmounted } from 'vue'
 
 definePageMeta({ ssr: false })
@@ -163,6 +155,11 @@ function handleSearch() {
     path: '/search',
     query: { q: keyword.value, category: selectedCategory.value, mode: searchMode.value },
   })
+}
+
+function searchKeyword(kw: string) {
+  keyword.value = kw
+  handleSearch()
 }
 
 // 搜索建议（debounced）
