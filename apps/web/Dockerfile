@@ -8,9 +8,16 @@ WORKDIR /app
 
 RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
 
+# 使用 npmmirror（淘宝镜像）提升 tarball 下载速度，HK 服务器到 npmjs.org 偶发超时
+RUN pnpm config set registry https://registry.npmmirror.com && \
+  # 改用 npm 风格扁平 node_modules，避开 pnpm store 导致的 esbuild binary 版本错配
+  pnpm config set node-linker hoisted
+
 COPY package.json pnpm-lock.yaml* ./
 
-RUN pnpm install --frozen-lockfile --prod=false
+RUN pnpm install --no-frozen-lockfile --prod=false --ignore-scripts && \
+  pnpm store prune || true && \
+  pnpm rebuild esbuild || true
 
 COPY . .
 

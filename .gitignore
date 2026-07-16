@@ -48,3 +48,6 @@ bin/
 *.tgz
 .turbo/
 .eslintcache
+
+# 备份目录（含数据库导出、敏感数据，禁止入库）
+dumps/

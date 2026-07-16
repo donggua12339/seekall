@@ -1,41 +1,31 @@
 version: '3.9'
 
 services:
-  caddy:
-    image: caddy:2-alpine
-    container_name: seekall-caddy
-    restart: unless-stopped
-    ports:
-      - '80:80'
-      - '443:443'
-    volumes:
-      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - ./caddy/data:/data
-      - ./caddy/config:/config
-      - ./logs/caddy:/var/log/caddy
-    depends_on:
-      - seekall-api
-      - seekall-web
-    networks:
-      - seekall-net
-
   seekall-api:
     build:
       context: ../apps/api
       dockerfile: Dockerfile
     container_name: seekall-api
     restart: unless-stopped
+    networks:
+      seekall-net:
+        ipv4_address: 172.18.0.5  # 固定 IP（nginx 反代依赖）
     env_file:
       - ../.env
     environment:
       - NODE_ENV=production
       - PORT=3000
+      # Docker 容器内 localhost 是自己，需用 service 名指向 mysql/meilisearch/redis
+      - DATABASE_URL=mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE}
+      - REDIS_URL=redis://redis:6379
+      - MEILISEARCH_URL=http://meilisearch:7700
     healthcheck:
-      test: ['CMD', 'wget', '--spider', '-q', 'http://localhost:3000/api/v1/health']
+      # API 实际用 APP_PORT=7301（不是 compose 写的 PORT=3000），用 node http 模块测健康
+      test: ['CMD', 'node', '-e', "require('http').get('http://localhost:7301/api/v1/health', r => process.exit(r.statusCode === 200 ? 0 : 1))"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 30s
+      start_period: 60s
     depends_on:
       mysql:
         condition: service_healthy
@@ -43,8 +33,6 @@ services:
         condition: service_healthy
       meilisearch:
         condition: service_started
-    networks:
-      - seekall-net
 
   seekall-web:
     build:
@@ -52,6 +40,9 @@ services:
       dockerfile: Dockerfile
     container_name: seekall-web
     restart: unless-stopped
+    networks:
+      seekall-net:
+        ipv4_address: 172.18.0.6  # 固定 IP（nginx 反代依赖）
     env_file:
       - ../.env
     environment:
@@ -60,15 +51,14 @@ services:
       - NUXT_PORT=3000
       - NUXT_PUBLIC_API_BASE=http://seekall-api:3000
     healthcheck:
-      test: ['CMD', 'wget', '--spider', '-q', 'http://localhost:3000/api/health']
+      # Nuxt 是 SSR，根路径 / 会渲染首页（200 OK）；用 curl 而不是 wget（alpine node 镜像没 wget）
+      test: ['CMD', 'node', '-e', "require('http').get('http://localhost:3000/', r => process.exit(r.statusCode === 200 ? 0 : 1))"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 30s
+      start_period: 60s
     depends_on:
       - seekall-api
-    networks:
-      - seekall-net
 
   mysql:
     image: mysql:8.0
@@ -82,8 +72,9 @@ services:
       - MYSQL_USER=${MYSQL_USER}
       - MYSQL_PASSWORD=${MYSQL_PASSWORD}
     command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    # 改用 docker 命名卷替代 bind mount（bind mount 在 lxd:docker 容器里权限问题反复）
     volumes:
-      - ./mysql/data:/var/lib/mysql
+      - mysql_data:/var/lib/mysql
       - ./mysql/init:/docker-entrypoint-initdb.d:ro
       - ./mysql/conf.d:/etc/mysql/conf.d:ro
       - ./backups/mysql:/backups
@@ -135,3 +126,12 @@ services:
 networks:
   seekall-net:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.18.0.0/24
+          gateway: 172.18.0.1
+    # 关键服务固定 IP（nginx 反代 + Prisma DATABASE_URL 都依赖这些地址）
+    # 重启 / 重建容器 IP 不变，避免上游配置失效
+
+volumes:
+  mysql_data:
