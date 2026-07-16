@@ -20,17 +20,44 @@ export class TgDirectProvider implements Provider {
   readonly category = 'tg' as const
 
   private readonly indexName = 'tg-resources'
+  /**
+   * 索引是否有数据。tg-collector 服务没跑时索引为空，此时 disabled。
+   * 避免每次搜索都去查一个必然为空的索引浪费 RTT。
+   * 由 healthCheck 异步刷新。
+   */
+  private indexReady = false
 
-  constructor(
-    private readonly meilisearchService: MeilisearchService,
-  ) {}
+  constructor(private readonly meilisearchService: MeilisearchService) {
+    // 异步探测索引是否有数据（不阻塞构造）
+    this.probeIndex().catch((err) => {
+      this.logger.debug(`TG direct index probe failed: ${(err as Error).message}`)
+    })
+  }
+
+  private async probeIndex(): Promise<void> {
+    try {
+      const stats = await this.meilisearchService.getClient().index(this.indexName).getStats()
+      this.indexReady = stats.numberOfDocuments > 0
+      if (this.indexReady) {
+        this.logger.log(`TG direct index ready: ${stats.numberOfDocuments} documents`)
+      } else {
+        this.logger.warn(
+          `TG direct index 'tg-resources' is empty. Run services/tg-collector to populate it. Provider will be disabled until data arrives.`,
+        )
+      }
+    } catch (err) {
+      this.logger.warn(`TG direct index probe failed: ${(err as Error).message}`)
+      this.indexReady = false
+    }
+  }
 
   get enabled(): boolean {
-    // 当 Meilisearch 可用时启用
-    return true
+    // 索引无数据时禁用，避免空查询浪费 RTT
+    return this.indexReady
   }
 
   async search(query: SearchQuery): Promise<SearchResult[]> {
+    if (!this.indexReady) return []
     try {
       const client = this.meilisearchService.getClient()
       const result = await client.index(this.indexName).search(query.keyword, {
@@ -66,7 +93,6 @@ export class TgDirectProvider implements Provider {
       })
     } catch (err) {
       this.logger.debug(`TG direct search failed: ${(err as Error).message}`)
-      // 索引不存在或 Meilisearch 不可用时返回空
       return []
     }
   }
@@ -75,8 +101,10 @@ export class TgDirectProvider implements Provider {
     try {
       const client = this.meilisearchService.getClient()
       const stats = await client.index(this.indexName).getStats()
-      return stats.numberOfDocuments > 0
+      this.indexReady = stats.numberOfDocuments > 0
+      return this.indexReady
     } catch {
+      this.indexReady = false
       return false
     }
   }

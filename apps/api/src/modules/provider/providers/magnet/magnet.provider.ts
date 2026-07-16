@@ -31,8 +31,11 @@ export class MagnetProvider implements Provider {
   }
 
   get enabled(): boolean {
-    // 默认启用（除非显式设为空字符串）
-    return this.baseUrl !== ''
+    // bt4g 国内被墙，默认禁用
+    // 需要时在 .env 设置 MAGNET_ENABLED=true + 可达的 MAGNET_SITE_URL
+    return (
+      this.baseUrl !== '' && this.configService.get<string>('MAGNET_ENABLED', 'false') === 'true'
+    )
   }
 
   async search(query: SearchQuery): Promise<SearchResult[]> {
@@ -121,7 +124,10 @@ export class MagnetProvider implements Provider {
   }
 
   private extractTag(xml: string, tag: string): string | null {
-    const regex = new RegExp(`<${tag}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]></${tag}>|<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, 'i')
+    const regex = new RegExp(
+      `<${tag}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]></${tag}>|<${tag}[^>]*>([\\s\\S]*?)</${tag}>`,
+      'i',
+    )
     const match = xml.match(regex)
     return match?.[1] ?? match?.[2] ?? null
   }

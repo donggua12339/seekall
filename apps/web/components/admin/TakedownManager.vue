@@ -7,12 +7,13 @@
 <script setup lang="ts">
 import { NDataTable, NButton, useMessage } from 'naive-ui'
 import { ref, reactive, onMounted, h } from 'vue'
+import type { TableRow } from '~/types/table'
 
 const { api } = useApi()
 const message = useMessage()
 
 const loading = ref(false)
-const records = ref<unknown[]>([])
+const records = ref<TableRow[]>([])
 const pagination = reactive({ page: 1, pageSize: 20, itemCount: 0 })
 
 const columns = [
@@ -24,13 +25,13 @@ const columns = [
   {
     title: '时间',
     key: 'createdAt',
-    render: (row: { createdAt: string }) => new Date(row.createdAt).toLocaleString(),
+    render: (row: TableRow) => new Date(String(row.createdAt)).toLocaleString(),
   },
   {
     title: '操作',
     key: 'actions',
-    render: (row: { id: bigint; status: string }) =>
-      row.status === 'pending'
+    render: (row: TableRow) =>
+      String(row.status) === 'pending'
         ? h('div', { class: 'flex gap-2' }, [
             h(
               NButton,
@@ -46,7 +47,7 @@ const columns = [
 async function load() {
   loading.value = true
   try {
-    const data = await api.get<{ list: unknown[]; total: number }>('/takedown', {
+    const data = await api.get<{ list: TableRow[]; total: number }>('/takedown', {
       page: pagination.page,
       pageSize: pagination.pageSize,
     })
@@ -57,7 +58,7 @@ async function load() {
   }
 }
 
-async function resolve(id: bigint, status: 'resolved' | 'rejected') {
+async function resolve(id: string, status: 'resolved' | 'rejected') {
   try {
     await api.patch(`/takedown/${id}/resolve`, { status })
     message.success(status === 'resolved' ? '已下架' : '已驳回')

@@ -43,26 +43,52 @@ describe('ProviderService', () => {
   describe('searchAll', () => {
     it('应该并发调用所有活跃 Provider 并合并结果', async () => {
       const p1 = new MockProvider('p1', 'P1', 'netdisk', true, [
-        { title: '资源 1', url: 'https://a.com/1', source: 'p1', sourceDisplayName: 'P1', category: 'netdisk' },
+        {
+          title: '资源 1',
+          url: 'https://a.com/1',
+          source: 'p1',
+          sourceDisplayName: 'P1',
+          category: 'netdisk',
+        },
       ])
       const p2 = new MockProvider('p2', 'P2', 'magnet', true, [
-        { title: '资源 2', url: 'https://b.com/2', source: 'p2', sourceDisplayName: 'P2', category: 'magnet' },
+        {
+          title: '资源 2',
+          url: 'https://b.com/2',
+          source: 'p2',
+          sourceDisplayName: 'P2',
+          category: 'magnet',
+        },
       ])
       buildService([p1, p2])
 
-      const { results, errors } = await service.searchAll({ keyword: '测试', page: 1, pageSize: 20 })
+      const { results, errors } = await service.searchAll({
+        keyword: '测试',
+        page: 1,
+        pageSize: 20,
+      })
       expect(results).toHaveLength(2)
       expect(errors).toHaveLength(0)
     })
 
     it('单个 Provider 失败时应该降级返回其他结果', async () => {
       const p1 = new MockProvider('p1', 'P1', 'netdisk', true, [
-        { title: '资源 1', url: 'https://a.com/1', source: 'p1', sourceDisplayName: 'P1', category: 'netdisk' },
+        {
+          title: '资源 1',
+          url: 'https://a.com/1',
+          source: 'p1',
+          sourceDisplayName: 'P1',
+          category: 'netdisk',
+        },
       ])
       const p2 = new MockProvider('p2', 'P2', 'magnet', true, [], true) // shouldFail = true
       buildService([p1, p2])
 
-      const { results, errors } = await service.searchAll({ keyword: '测试', page: 1, pageSize: 20 })
+      const { results, errors } = await service.searchAll({
+        keyword: '测试',
+        page: 1,
+        pageSize: 20,
+      })
       expect(results).toHaveLength(1)
       expect(errors).toHaveLength(1)
       expect(errors[0]).toContain('p2')
@@ -72,7 +98,11 @@ describe('ProviderService', () => {
       const p1 = new MockProvider('p1', 'P1', 'netdisk', false)
       buildService([p1])
 
-      const { results, errors } = await service.searchAll({ keyword: '测试', page: 1, pageSize: 20 })
+      const { results, errors } = await service.searchAll({
+        keyword: '测试',
+        page: 1,
+        pageSize: 20,
+      })
       expect(results).toHaveLength(0)
       expect(errors).toHaveLength(1)
       expect(errors[0]).toBe('no active provider')
@@ -80,8 +110,20 @@ describe('ProviderService', () => {
 
     it('应该按 URL 去重', async () => {
       const p1 = new MockProvider('p1', 'P1', 'netdisk', true, [
-        { title: '资源 1', url: 'https://a.com/1', source: 'p1', sourceDisplayName: 'P1', category: 'netdisk' },
-        { title: '资源 2', url: 'https://a.com/1/', source: 'p1', sourceDisplayName: 'P1', category: 'netdisk' }, // 尾部斜杠差异，normalize 后相同
+        {
+          title: '资源 1',
+          url: 'https://a.com/1',
+          source: 'p1',
+          sourceDisplayName: 'P1',
+          category: 'netdisk',
+        },
+        {
+          title: '资源 2',
+          url: 'https://a.com/1/',
+          source: 'p1',
+          sourceDisplayName: 'P1',
+          category: 'netdisk',
+        }, // 尾部斜杠差异，normalize 后相同
       ])
       buildService([p1])
 
@@ -91,7 +133,13 @@ describe('ProviderService', () => {
 
     it('应该返回耗时', async () => {
       const p1 = new MockProvider('p1', 'P1', 'netdisk', true, [
-        { title: '资源 1', url: 'https://a.com/1', source: 'p1', sourceDisplayName: 'P1', category: 'netdisk' },
+        {
+          title: '资源 1',
+          url: 'https://a.com/1',
+          source: 'p1',
+          sourceDisplayName: 'P1',
+          category: 'netdisk',
+        },
       ])
       buildService([p1])
 

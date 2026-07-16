@@ -71,6 +71,53 @@
         <template v-else-if="searchMode === 'fuzzy'">本地索引，极速</template>
         <template v-else>实时 + 索引合并</template>
       </span>
+
+      <!-- 流式开关（仅 live 模式可见） -->
+      <n-tooltip v-if="searchMode === 'live'" placement="top">
+        <template #trigger>
+          <n-switch
+            v-model:value="streamMode"
+            size="small"
+            @update:value="(v) => v && page === 1 && doSearch()"
+          />
+        </template>
+        流式搜索：Provider 完成即推送，先到先显
+      </n-tooltip>
+    </div>
+
+    <!-- 流式进度指示器 -->
+    <div
+      v-if="streaming"
+      class="mb-4 text-sm bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg p-3"
+    >
+      <div class="flex items-center gap-2 mb-2">
+        <n-spin size="small" />
+        <span class="font-medium">流式搜索中…</span>
+        <span class="text-gray-500 ml-auto">
+          已找到
+          <span class="font-semibold text-indigo-600 dark:text-indigo-400">{{
+            result?.list.length || 0
+          }}</span>
+          条 · 已到达 {{ streamArrivedProviders.size }} / {{ streamProviders.length }} 个源
+        </span>
+      </div>
+      <div class="flex flex-wrap gap-1">
+        <n-tag
+          v-for="p in streamProviders"
+          :key="p"
+          size="tiny"
+          :type="streamArrivedProviders.has(p) ? 'success' : 'default'"
+        >
+          {{ p }}{{ streamArrivedProviders.has(p) ? ' ✓' : ' …' }}
+        </n-tag>
+      </div>
+      <div
+        v-if="streamErrors.length > 0"
+        class="mt-2 text-xs text-red-500 flex items-center gap-2 flex-wrap"
+      >
+        <span>失败：{{ streamErrors.map((e) => e.provider).join('、') }}</span>
+        <n-button size="tiny" type="error" ghost @click="doSearch">重试</n-button>
+      </div>
     </div>
 
     <!-- 结果信息 -->
@@ -86,7 +133,7 @@
         </span>
       </div>
       <n-tag size="small" :type="providersTagType">
-        {{ result.providers.join(' + ') }}
+        {{ (result.providers || []).join(' + ') }}
       </n-tag>
     </div>
 
@@ -163,10 +210,10 @@
 
           <!-- 有效性投票 -->
           <n-button-group size="small">
-            <n-button @click="voteLink(item.url, 'up')" :loading="votingUrl === item.url">
+            <n-button :loading="votingUrl === item.url" @click="voteLink(item.url, 'up')">
               👍 {{ item.voteUp || 0 }}
             </n-button>
-            <n-button @click="voteLink(item.url, 'down')" :loading="votingUrl === item.url">
+            <n-button :loading="votingUrl === item.url" @click="voteLink(item.url, 'down')">
               👎 {{ item.voteDown || 0 }}
             </n-button>
           </n-button-group>
@@ -178,13 +225,20 @@
       </n-card>
 
       <!-- 分页 -->
-      <div v-if="result.totalPages > 1" class="flex-center pt-4">
+      <div v-if="!streaming && result.totalPages > 1" class="flex-center pt-4">
         <n-pagination
           v-model:page="page"
           :page-count="result.totalPages"
           @update:page="onPageChange"
         />
       </div>
+    </div>
+
+    <!-- 流式期间底部骨架屏（结果未全部到达时显示） -->
+    <div v-if="streaming && (result?.list.length || 0) > 0" class="space-y-3 mt-3 opacity-60">
+      <n-card v-for="i in 2" :key="`skeleton-${i}`">
+        <n-skeleton text :repeat="3" />
+      </n-card>
     </div>
 
     <!-- 空状态 -->
@@ -194,11 +248,58 @@
     >
       <n-empty :description="emptyDescription">
         <template #extra>
-          <n-space vertical align="center">
-            <n-button v-if="searchMode !== 'fuzzy'" type="primary" @click="switchToFuzzy">
-              试试模糊搜索
+          <n-space vertical align="center" :size="12">
+            <!-- 主操作：切换搜索模式 -->
+            <n-space justify="center">
+              <n-button v-if="searchMode !== 'fuzzy'" type="primary" @click="switchToFuzzy">
+                试试模糊搜索
+              </n-button>
+              <n-button v-if="searchMode !== 'combined'" quaternary @click="switchToCombined">
+                尝试组合搜索
+              </n-button>
+              <n-button v-if="searchMode !== 'live'" quaternary @click="switchToLive">
+                尝试实时搜索
+              </n-button>
+            </n-space>
+
+            <!-- 移除过滤器 -->
+            <n-button
+              v-if="fileTypeFilter || tagFilter || sortBy !== 'relevance'"
+              size="small"
+              quaternary
+              type="warning"
+              @click="clearFilters"
+            >
+              清除过滤器重试
             </n-button>
-            <n-button quaternary @click="switchToCombined"> 尝试组合搜索 </n-button>
+
+            <!-- 订阅关键词 -->
+            <n-button
+              v-if="authStore.isLoggedIn && keyword"
+              size="small"
+              quaternary
+              :loading="subscribing"
+              @click="toggleSubscribe"
+            >
+              {{ isSubscribed ? '已订阅此关键词' : '+ 订阅此关键词，新结果通知我' }}
+            </n-button>
+
+            <!-- 跳转外部搜索 -->
+            <div class="text-xs text-gray-400 mt-2">
+              没找到？试试外部搜索：
+              <n-button
+                v-for="ext in externalSearchEngines"
+                :key="ext.name"
+                size="tiny"
+                quaternary
+                tag="a"
+                :href="ext.url + encodeURIComponent(keyword)"
+                target="_blank"
+                rel="noopener"
+              >
+                {{ ext.name }}
+              </n-button>
+            </div>
           </n-space>
         </template>
       </n-empty>
@@ -222,9 +323,13 @@ import {
   NIcon,
   NSpace,
   NSelect,
+  NSwitch,
+  NSpin,
+  NTooltip,
   useMessage,
 } from 'naive-ui'
 import { ref, computed, watch, onMounted, onUnmounted, h } from 'vue'
+import { watchDebounced } from '@vueuse/core'
 
 interface SearchResultItem {
   title: string
@@ -273,14 +378,38 @@ const page = ref(1)
 const pageSize = ref(20)
 const loading = ref(false)
 const result = ref<SearchResponse | null>(null)
+// 在 setup 顶部获取 runtimeConfig，事件处理函数里 useRuntimeConfig() 会丢失 Nuxt 上下文
+const runtimeConfig = useRuntimeConfig()
 const searchMode = ref<'live' | 'fuzzy' | 'combined'>(
   (route.query.mode as 'live' | 'fuzzy' | 'combined') || 'live',
 )
 const sortBy = ref<string>((route.query.sort as string) || 'relevance')
-const fileTypeFilter = ref<string | null>(
-  (route.query.fileType as string) || null,
-)
+const fileTypeFilter = ref<string | null>((route.query.fileType as string) || null)
 const tagFilter = ref<string | null>(null)
+
+// 流式搜索状态
+const streamMode = ref<boolean>(searchMode.value === 'live')
+const streaming = ref(false)
+const streamProviders = ref<string[]>([])
+const streamArrivedProviders = ref<Set<string>>(new Set())
+const streamErrors = ref<Array<{ provider: string; error: string }>>([])
+let streamEventSource: EventSource | null = null
+
+// 外部搜索引擎（空结果时引导）
+const externalSearchEngines = [
+  { name: 'Google', url: 'https://www.google.com/search?q=' },
+  { name: 'Bing', url: 'https://www.bing.com/search?q=' },
+  { name: '百度', url: 'https://www.baidu.com/s?wd=' },
+  { name: 'F搜', url: 'https://fsoufsou.com/search?q=' },
+]
+
+function clearFilters() {
+  fileTypeFilter.value = null
+  tagFilter.value = null
+  sortBy.value = 'relevance'
+  page.value = 1
+  doSearch()
+}
 
 // 资源标签元数据
 const TAG_LABELS: Record<string, string> = {
@@ -330,9 +459,45 @@ const tagOptions = computed(() => {
 // 客户端标签筛选（不重新发起请求，直接过滤当前结果）
 const filteredList = computed(() => {
   if (!result.value) return []
-  if (!tagFilter.value) return result.value.list
-  return result.value.list.filter((item) => item.tags?.includes(tagFilter.value!))
+  let list = result.value.list
+  // 客户端标签过滤
+  if (tagFilter.value) {
+    list = list.filter((item) => item.tags?.includes(tagFilter.value!))
+  }
+  // 客户端 fileType 过滤（流式模式下服务端不过滤，前端即时过滤）
+  if (fileTypeFilter.value && streaming.value) {
+    list = list.filter(
+      (r) =>
+        r.fileType === fileTypeFilter.value ||
+        r.fileType?.includes(fileTypeFilter.value!) ||
+        r.category === fileTypeFilter.value,
+    )
+  }
+  // 流式完成后按用户排序重排
+  if (!streaming.value && sortBy.value !== 'relevance') {
+    const arr = [...list]
+    if (sortBy.value === 'time') {
+      arr.sort((a, b) => {
+        const ta = extractTimeForSort(a) || 0
+        const tb = extractTimeForSort(b) || 0
+        return tb - ta
+      })
+    } else if (sortBy.value === 'size') {
+      arr.sort((a, b) => (b.fileSize || 0) - (a.fileSize || 0))
+    } else if (sortBy.value === 'source') {
+      arr.sort((a, b) => a.sourceDisplayName.localeCompare(b.sourceDisplayName))
+    }
+    return arr
+  }
+  return list
 })
+
+function extractTimeForSort(item: SearchResultItem): number | null {
+  const meta = item.resourceMeta as { datetime?: string | null } | undefined
+  if (!meta?.datetime) return null
+  const t = new Date(meta.datetime).getTime()
+  return isNaN(t) ? null : t
+}
 
 function applyClientFilters() {
   // 触发 filteredList 重新计算即可
@@ -406,18 +571,27 @@ const fileTypeOptions = computed(() => {
 const providersTagType = computed<'default' | 'success' | 'info' | 'warning'>(() => {
   if (!result.value) return 'default'
   if (result.value.fromIndex) return 'info'
-  if (result.value.providers.length > 1) return 'success'
+  if ((result.value.providers || []).length > 1) return 'success'
   return 'default'
 })
 
 const emptyDescription = computed(() => {
-  if (searchMode.value === 'live') return '实时搜索无结果，可尝试模糊搜索（从历史索引匹配）'
+  if (searchMode.value === 'live') return '实时搜索无结果，可尝试模糊搜索或组合搜索'
   if (searchMode.value === 'fuzzy') return '索引中无匹配结果，可尝试实时搜索或组合搜索'
-  return '暂无搜索结果，换个关键词试试'
+  return '组合搜索也无结果，换个关键词试试'
 })
 
 async function doSearch() {
   if (!keyword.value.trim()) return
+
+  // 关闭可能存在的 SSE
+  closeStream()
+
+  // 流式模式：仅 live 模式第一页启用
+  if (streamMode.value && searchMode.value === 'live' && page.value === 1) {
+    return doStreamSearch()
+  }
+
   loading.value = true
 
   // 更新 URL（保留查询历史）
@@ -455,45 +629,186 @@ async function doSearch() {
   }
 }
 
+/**
+ * 流式搜索 - 通过 SSE 接收每个 Provider 的结果，先到先显
+ */
+function doStreamSearch(retryCount = 0) {
+  streaming.value = true
+  // 流式期间不显示全屏骨架屏，改为底部追加骨架屏
+  loading.value = false
+  streamProviders.value = []
+  streamArrivedProviders.value = new Set()
+  streamErrors.value = []
+
+  // 初始化空结果集，UI 立即显示"搜索中"状态
+  // 关键：必须预置 providers/errors 字段，否则模板 result.providers.join() / result.errors.length 会崩溃
+  result.value = {
+    list: [],
+    total: 0,
+    totalPages: 0,
+    page: 1,
+    pageSize: pageSize.value,
+    durationMs: 0,
+    providers: [],
+    errors: [],
+    fromIndex: false,
+  }
+
+  // 更新 URL
+  router.replace({
+    path: '/search',
+    query: {
+      q: keyword.value,
+      mode: searchMode.value,
+      sort: sortBy.value,
+      fileType: fileTypeFilter.value || undefined,
+      page: '1',
+    },
+  })
+
+  // 构造 SSE URL
+  const params = new URLSearchParams({
+    keyword: keyword.value,
+    page: '1',
+    pageSize: String(pageSize.value),
+    sort: sortBy.value,
+  })
+  if (fileTypeFilter.value) params.set('fileType', fileTypeFilter.value)
+
+  // SSE 目标：优先用配置的 sseBase；否则用 window.location.origin（同源，避免 CSP 跨域阻止）
+  // 浏览器场景才解析 origin；SSR 阶段 fallback 到 localhost:7301（不会真正发请求）
+  const sseBase =
+    (runtimeConfig.public.sseBase as string) ||
+    (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:7301')
+  const url = `${sseBase}/api/v1/search/stream?${params.toString()}`
+
+  streamEventSource = new EventSource(url)
+
+  streamEventSource.addEventListener('start', (e) => {
+    try {
+      const data = JSON.parse((e as MessageEvent).data)
+      streamProviders.value = data.providers || []
+      // 同步更新 result.value.providers（模板第 127 行需要这个字段）
+      if (result.value) {
+        result.value.providers = data.providers || []
+      }
+    } catch {}
+  })
+
+  streamEventSource.addEventListener('partial', (e) => {
+    try {
+      const data = JSON.parse((e as MessageEvent).data)
+      streamArrivedProviders.value.add(data.provider)
+      if (result.value) {
+        result.value.list = [...result.value.list, ...data.results]
+        result.value.total = result.value.list.length
+        result.value.totalPages = Math.ceil(result.value.list.length / pageSize.value)
+      }
+    } catch {}
+  })
+
+  streamEventSource.addEventListener('provider-error', (e) => {
+    try {
+      const data = JSON.parse((e as MessageEvent).data)
+      streamArrivedProviders.value.add(data.provider)
+      streamErrors.value.push({ provider: data.provider, error: data.error })
+    } catch {}
+  })
+
+  streamEventSource.addEventListener('complete', (e) => {
+    try {
+      const data = JSON.parse((e as MessageEvent).data)
+      if (result.value) {
+        result.value.durationMs = data.durationMs || 0
+      }
+    } catch {}
+    closeStream()
+  })
+
+  streamEventSource.addEventListener('error', () => {
+    // SSE 连接异常
+    const wasStreaming = streaming.value
+    closeStream()
+    if (wasStreaming && retryCount < 1) {
+      // 自动重连 1 次
+      setTimeout(() => doStreamSearch(retryCount + 1), 1000)
+    } else if (wasStreaming) {
+      // 重连失败，显示重试按钮
+      streamErrors.value.push({ provider: 'SSE', error: '连接中断，请重试' })
+      message.error('流式搜索连接中断，可点击重试')
+    }
+  })
+}
+
+function closeStream() {
+  if (streamEventSource) {
+    streamEventSource.close()
+    streamEventSource = null
+  }
+  streaming.value = false
+  loading.value = false
+}
+
 function onPageChange(p: number) {
   page.value = p
   doSearch()
 }
 
 function switchToFuzzy() {
+  closeStream()
   searchMode.value = 'fuzzy'
+  streamMode.value = false
   page.value = 1
   doSearch()
 }
 
 function switchToCombined() {
+  closeStream()
   searchMode.value = 'combined'
+  streamMode.value = false
   page.value = 1
   doSearch()
 }
 
+function switchToLive() {
+  closeStream()
+  searchMode.value = 'live'
+  streamMode.value = true
+  page.value = 1
+  doSearch()
+}
+
+// 记录上次处理过的 q/mode，避免分页时重复搜索
+let lastQ = ''
+let lastMode = ''
 watch(
   () => route.query,
   () => {
     const q = route.query.q as string
     const mode = route.query.mode as 'live' | 'fuzzy' | 'combined'
+    const urlPage = Number(route.query.page) || 1
+    // 只在 q 或 mode 变化时才重新搜索（分页由 onPageChange 直接处理）
+    if (q === lastQ && mode === lastMode) {
+      page.value = urlPage
+      return
+    }
+    lastQ = q
+    lastMode = mode
     if (q && q !== keyword.value) {
       keyword.value = q
     }
     if (mode && mode !== searchMode.value) {
       searchMode.value = mode
     }
-    page.value = 1
+    page.value = urlPage
     doSearch()
   },
 )
 
 // 快捷键：/ 聚焦搜索框，1/2/3 切换搜索模式
-const searchInputRef = ref<InstanceType<typeof NInput> | null>(null)
 function handleKeydown(e: KeyboardEvent) {
   const inInput =
-    document.activeElement?.tagName === 'INPUT' ||
-    document.activeElement?.tagName === 'TEXTAREA'
+    document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA'
 
   if (e.key === '/' && !inInput) {
     e.preventDefault()
@@ -529,10 +844,11 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
+  closeStream()
 })
 
 // 关键词变化时检查订阅状态
-watch(
+watchDebounced(
   keyword,
   () => {
     checkSubscriptionStatus()
@@ -596,8 +912,9 @@ async function addToFavorite(item: SearchResultItem) {
 }
 
 function goToDetail(item: SearchResultItem) {
-  const data = encodeURIComponent(btoa(JSON.stringify(item)))
-  router.push({ path: '/resource', query: { data } })
+  // btoa 不支持 Unicode，先 encodeURIComponent 再 base64
+  const encoded = btoa(encodeURIComponent(JSON.stringify(item)))
+  router.push({ path: '/resource', query: { data: encoded } })
 }
 
 async function reportDead(url: string) {

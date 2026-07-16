@@ -103,8 +103,11 @@ const saving = ref(false)
 
 const preferences = reactive({
   theme: 'auto',
+  language: 'zh-CN',
   searchPageSize: 20,
   safeSearch: true,
+  preferredCategories: [] as string[],
+  preferredProviders: [] as string[],
 })
 
 const pageSizeOptions = [
@@ -123,15 +126,37 @@ onMounted(async () => {
     const data = await api.get('/user/profile')
     user.value = data as never
     if (
-      (data as { preferences?: { theme?: string; searchPageSize?: number; safeSearch?: boolean } })
-        .preferences
+      (
+        data as {
+          preferences?: {
+            theme?: string
+            language?: string
+            searchPageSize?: number
+            safeSearch?: boolean
+            preferredCategories?: string[]
+            preferredProviders?: string[]
+          }
+        }
+      ).preferences
     ) {
       const p = (
-        data as { preferences: { theme?: string; searchPageSize?: number; safeSearch?: boolean } }
+        data as {
+          preferences: {
+            theme?: string
+            language?: string
+            searchPageSize?: number
+            safeSearch?: boolean
+            preferredCategories?: string[]
+            preferredProviders?: string[]
+          }
+        }
       ).preferences
       preferences.theme = p.theme || 'auto'
+      preferences.language = p.language || 'zh-CN'
       preferences.searchPageSize = p.searchPageSize || 20
       preferences.safeSearch = p.safeSearch ?? true
+      preferences.preferredCategories = p.preferredCategories || []
+      preferences.preferredProviders = p.preferredProviders || []
     }
   } catch (err) {
     message.error((err as Error).message)
@@ -162,10 +187,19 @@ async function activateMembership() {
 async function savePreferences() {
   saving.value = true
   try {
-    await api.patch('/user/profile', { preferences })
+    await api.patch('/user/profile', {
+      preferences: {
+        theme: preferences.theme,
+        language: preferences.language,
+        searchPageSize: preferences.searchPageSize,
+        safeSearch: preferences.safeSearch,
+        preferredCategories: preferences.preferredCategories,
+        preferredProviders: preferences.preferredProviders,
+      },
+    })
     message.success('已保存')
   } catch (err) {
-    message.error((err as Error).message)
+    message.error((err as Error).message || '保存失败')
   } finally {
     saving.value = false
   }

@@ -1,12 +1,22 @@
 # 觅源 SeekAll - Caddy 配置
 # 主域名：seekall.winmelon.cn
 # 后台子域名：admin.seekall.winmelon.cn
+#
+# HTTPS 由上游 nginx 终止（*.winmelon.cn 通配符证书）
+# Caddy 在这里只跑 HTTP 模式，所以关闭 auto_https
+# 监听端口：容器内 80 → 暴露到宿主 8080（被 nginx 反代）
+
+{
+    admin off
+    http_port 80
+    https_port 443
+}
 
 # ---------- 主站 ----------
 seekall.winmelon.cn {
     # API 接口
     handle /api/* {
-        reverse_proxy seekall-api:3000 {
+        reverse_proxy seekall-api:7301 {
             header_up X-Real-IP {remote_host}
             header_up X-Forwarded-For {remote_host}
             header_up X-Forwarded-Proto {scheme}
@@ -15,15 +25,15 @@ seekall.winmelon.cn {
 
     # Swagger 文档（仅 dev/staging 开放，prod 关闭由后端控制）
     handle /docs {
-        reverse_proxy seekall-api:3000
+        reverse_proxy seekall-api:7301
     }
     handle /docs-json {
-        reverse_proxy seekall-api:3000
+        reverse_proxy seekall-api:7301
     }
 
     # 健康检查
     handle /api/v1/health {
-        reverse_proxy seekall-api:3000
+        reverse_proxy seekall-api:7301
     }
 
     # 前端 SSR（Nuxt 3）

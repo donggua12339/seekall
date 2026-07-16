@@ -7,7 +7,7 @@
     </div>
 
     <div v-else-if="result && result.list.length > 0" class="space-y-3">
-      <n-card v-for="item in result.list" :key="item.id" :title="item.title" hoverable>
+      <n-card v-for="item in result.list" :key="String(item.id)" :title="item.title" hoverable>
         <template #header-extra>
           <n-tag size="small">{{ item.source }}</n-tag>
         </template>
@@ -41,7 +41,7 @@ const message = useMessage()
 const loading = ref(false)
 const page = ref(1)
 const result = ref<{
-  list: { id: bigint; title: string; resourceUrl: string; source: string }[]
+  list: { id: string; title: string; resourceUrl: string; source: string }[]
   totalPages: number
 } | null>(null)
 
@@ -60,7 +60,7 @@ async function load() {
   }
 }
 
-async function removeFavorite(id: bigint) {
+async function removeFavorite(id: string) {
   try {
     await api.delete(`/favorites/${id}`)
     message.success('已取消收藏')

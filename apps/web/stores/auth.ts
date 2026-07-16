@@ -24,7 +24,11 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function login(username: string, password: string) {
     const { api } = useApi()
-    const data = await api.post('/auth/login', { username, password })
+    const data = await api.post<{
+      accessToken: string
+      refreshToken: string
+      user: User
+    }>('/auth/login', { username, password })
 
     accessToken.value = data.accessToken
     refreshToken.value = data.refreshToken
@@ -52,8 +56,15 @@ export const useAuthStore = defineStore('auth', () => {
   async function refresh() {
     if (!refreshToken.value) return
     try {
-      const { api } = useApi()
-      const data = await api.post('/auth/refresh', { refreshToken: refreshToken.value })
+      // 用裸 $fetch 直接调用 refresh 接口，不能走 useApi（否则 401 会触发 useApi 内的 refresh 逻辑，导致无限递归）
+      const config = useRuntimeConfig()
+      const data = await $fetch<{ accessToken: string; refreshToken: string }>(
+        `${config.public.apiBase}/auth/refresh`,
+        {
+          method: 'POST',
+          body: { refreshToken: refreshToken.value },
+        },
+      )
       accessToken.value = data.accessToken
       refreshToken.value = data.refreshToken
       if (import.meta.client) {
@@ -103,7 +114,17 @@ export const useAuthStore = defineStore('auth', () => {
     if (!accessToken.value) return
     try {
       const data = await $fetch<{
-        data: { id: string; username: string; role: string; isPaid: boolean }
+        data: {
+          id: string
+          username: string
+          email: string
+          role: string
+          isPaid: boolean
+          paidUntil: string | null
+          status: string
+          badge: string | null
+          avatarUrl: string | null
+        }
       }>('/api/v1/user/profile', {
         headers: { Authorization: `Bearer ${accessToken.value}` },
       })

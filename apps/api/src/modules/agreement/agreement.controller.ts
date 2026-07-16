@@ -3,6 +3,7 @@ import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger'
 import { AgreementService } from './agreement.service'
 import { Roles } from '../../common/decorators/roles.decorator'
 import { Public } from '../../common/decorators/public.decorator'
+import { CurrentUser } from '../../common/decorators/current-user.decorator'
 import { IsString, IsDateString } from 'class-validator'
 
 class CreateDto {
@@ -27,14 +28,14 @@ export class AgreementController {
   @Roles('super_admin')
   @Post()
   @ApiOperation({ summary: '发布新版本用户协议' })
-  create(@Body() dto: CreateDto) {
+  create(@Body() dto: CreateDto, @CurrentUser('sub') userId: string) {
     return this.service.create(
       {
         version: dto.version,
         content: dto.content,
         effectiveDate: new Date(dto.effectiveDate),
       },
-      0n, // TODO: 从 CurrentUser 获取
+      BigInt(userId),
     )
   }
 }

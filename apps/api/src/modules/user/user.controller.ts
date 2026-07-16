@@ -3,17 +3,34 @@ import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger'
 import { UserService } from './user.service'
 import { AuthService } from '../auth/auth.service'
 import { CurrentUser } from '../../common/decorators/current-user.decorator'
-import { IsString, IsOptional, IsInt, Min, Max, IsBoolean, IsArray } from 'class-validator'
+import {
+  IsString,
+  IsOptional,
+  IsInt,
+  Min,
+  Max,
+  IsBoolean,
+  IsArray,
+  ValidateNested,
+} from 'class-validator'
+import { Type } from 'class-transformer'
 
-class UpdateProfileDto {
-  @IsOptional() @IsString() avatarUrl?: string
-  @IsOptional() @IsString() bio?: string
+class PreferencesDto {
   @IsOptional() @IsString() theme?: string
   @IsOptional() @IsString() language?: string
   @IsOptional() @IsInt() @Min(10) @Max(50) searchPageSize?: number
   @IsOptional() @IsBoolean() safeSearch?: boolean
   @IsOptional() @IsArray() preferredCategories?: string[]
   @IsOptional() @IsArray() preferredProviders?: string[]
+}
+
+class UpdateProfileDto {
+  @IsOptional() @IsString() avatarUrl?: string
+  @IsOptional() @IsString() bio?: string
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => PreferencesDto)
+  preferences?: PreferencesDto
 }
 
 class ActivateMembershipDto {

@@ -121,7 +121,11 @@ export class AuthService {
   async login(
     username: string,
     password: string,
-  ): Promise<{ accessToken: string; refreshToken: string; user: Omit<User, 'passwordHash' | 'emailVerifyToken' | 'passwordResetToken'> }> {
+  ): Promise<{
+    accessToken: string
+    refreshToken: string
+    user: Omit<User, 'passwordHash' | 'emailVerifyToken' | 'passwordResetToken'>
+  }> {
     const user = await this.prisma.user.findUnique({
       where: { username },
     })
@@ -151,8 +155,16 @@ export class AuthService {
       data: { lastLoginAt: new Date() },
     })
 
-    const { passwordHash: _ph, emailVerifyToken: _evt, passwordResetToken: _prt, ...safeUser } = user
-    return { ...tokens, user: safeUser as Omit<User, 'passwordHash' | 'emailVerifyToken' | 'passwordResetToken'> }
+    const {
+      passwordHash: _ph,
+      emailVerifyToken: _evt,
+      passwordResetToken: _prt,
+      ...safeUser
+    } = user
+    return {
+      ...tokens,
+      user: safeUser as Omit<User, 'passwordHash' | 'emailVerifyToken' | 'passwordResetToken'>,
+    }
   }
 
   async verifyEmail(token: string): Promise<{ message: string }> {
@@ -296,10 +308,12 @@ export class AuthService {
   /**
    * 获取用户登录设备列表
    */
-  async getSessions(userId: bigint): Promise<
-    Array<{ id: string; loginAt: string; ip: string; ua: string; current?: boolean }>
-  > {
-    const data = await this.redis.hgetall(`sessions:${userId}`).catch(() => ({} as Record<string, string>))
+  async getSessions(
+    userId: bigint,
+  ): Promise<Array<{ id: string; loginAt: string; ip: string; ua: string; current?: boolean }>> {
+    const data = await this.redis
+      .hgetall(`sessions:${userId}`)
+      .catch(() => ({}) as Record<string, string>)
     return Object.entries(data).map(([id, json]) => {
       try {
         return JSON.parse(json) as { id: string; loginAt: string; ip: string; ua: string }
@@ -373,12 +387,15 @@ export class AuthService {
   /**
    * 绑定 GitHub 账号到已有用户（已登录用户在个人主页操作）
    */
-  async bindGithub(userId: bigint, profile: {
-    id: string
-    username: string
-    emails?: Array<{ value: string; verified: boolean }>
-    photos?: Array<{ value: string }>
-  }): Promise<{ message: string }> {
+  async bindGithub(
+    userId: bigint,
+    profile: {
+      id: string
+      username: string
+      emails?: Array<{ value: string; verified: boolean }>
+      photos?: Array<{ value: string }>
+    },
+  ): Promise<{ message: string }> {
     if (!this.prisma.isAvailable()) {
       throw new BusinessException(ErrorCode.INTERNAL_ERROR, 503)
     }

@@ -37,7 +37,7 @@
 </template>
 
 <script setup lang="ts">
-import { NCard, NForm, NFormItem, NInput, NButton, useMessage } from 'naive-ui'
+import { NCard, NForm, NFormItem, NInput, NButton, NDivider, useMessage } from 'naive-ui'
 import { ref, reactive } from 'vue'
 import type { FormInst, FormRules } from 'naive-ui'
 import { useAuthStore } from '~/stores/auth'

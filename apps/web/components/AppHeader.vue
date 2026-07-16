@@ -16,34 +16,38 @@
         >
           搜索
         </NuxtLink>
-        <NuxtLink
-          v-if="authStore.isLoggedIn"
-          to="/favorites"
-          class="px-3 py-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-sm"
-        >
-          收藏
-        </NuxtLink>
-        <NuxtLink
-          v-if="authStore.isLoggedIn"
-          to="/subscriptions"
-          class="px-3 py-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-sm"
-        >
-          订阅
-        </NuxtLink>
-        <NuxtLink
-          v-if="authStore.isLoggedIn"
-          to="/profile"
-          class="px-3 py-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-sm"
-        >
-          个人主页
-        </NuxtLink>
-        <NuxtLink
-          v-if="authStore.isAdmin"
-          to="/admin"
-          class="px-3 py-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-sm"
-        >
-          后台
-        </NuxtLink>
+
+        <!-- auth 相关元素用 ClientOnly 包裹，避免 SSR/CSR hydration mismatch -->
+        <ClientOnly>
+          <NuxtLink
+            v-if="authStore.isLoggedIn"
+            to="/favorites"
+            class="px-3 py-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-sm"
+          >
+            收藏
+          </NuxtLink>
+          <NuxtLink
+            v-if="authStore.isLoggedIn"
+            to="/subscriptions"
+            class="px-3 py-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-sm"
+          >
+            订阅
+          </NuxtLink>
+          <NuxtLink
+            v-if="authStore.isLoggedIn"
+            to="/profile"
+            class="px-3 py-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-sm"
+          >
+            个人主页
+          </NuxtLink>
+          <NuxtLink
+            v-if="authStore.isAdmin"
+            to="/admin"
+            class="px-3 py-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-sm"
+          >
+            后台
+          </NuxtLink>
+        </ClientOnly>
 
         <!-- 主题切换 -->
         <n-button size="small" quaternary @click="toggleTheme" :title="themeToggleTitle">
@@ -55,17 +59,25 @@
           ?
         </n-button>
 
-        <template v-if="!authStore.isLoggedIn">
-          <NuxtLink to="/auth/login">
-            <n-button size="small">登录</n-button>
-          </NuxtLink>
-          <NuxtLink to="/auth/register">
-            <n-button size="small" type="primary">注册</n-button>
-          </NuxtLink>
-        </template>
-        <template v-else>
-          <n-button size="small" @click="authStore.logout()">退出</n-button>
-        </template>
+        <ClientOnly>
+          <template v-if="!authStore.isLoggedIn">
+            <NuxtLink to="/auth/login">
+              <n-button size="small">登录</n-button>
+            </NuxtLink>
+            <NuxtLink to="/auth/register">
+              <n-button size="small" type="primary">注册</n-button>
+            </NuxtLink>
+          </template>
+          <template v-else>
+            <n-button size="small" @click="handleLogout">退出</n-button>
+          </template>
+          <!-- SSR 占位，避免布局抖动 -->
+          <template #fallback>
+            <NuxtLink to="/auth/login">
+              <n-button size="small">登录</n-button>
+            </NuxtLink>
+          </template>
+        </ClientOnly>
       </nav>
     </div>
 
@@ -88,6 +100,11 @@ const themeToggleTitle = computed(() =>
 
 function toggleTheme() {
   colorMode.preference = colorMode.preference === 'dark' ? 'light' : 'dark'
+}
+
+function handleLogout() {
+  authStore.logout()
+  navigateTo('/')
 }
 
 // g-prefix 导航快捷键

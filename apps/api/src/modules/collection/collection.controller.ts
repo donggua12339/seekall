@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Post, Patch, Delete, Param, Query, ParseIntPipe } from '@nestjs/common'
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Param,
+  Query,
+  ParseIntPipe,
+} from '@nestjs/common'
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger'
 import { CollectionService } from './collection.service'
 import { CurrentUser } from '../../common/decorators/current-user.decorator'
@@ -7,13 +17,21 @@ import { ApiProperty } from '@nestjs/swagger'
 
 class CreateCollectionDto {
   @ApiProperty({ description: '合集标题' })
-  @IsString() @Length(1, 128) title!: string
+  @IsString()
+  @Length(1, 128)
+  title!: string
   @ApiProperty({ description: '描述', required: false })
-  @IsOptional() @IsString() description?: string
+  @IsOptional()
+  @IsString()
+  description?: string
   @ApiProperty({ description: '封面 URL', required: false })
-  @IsOptional() @IsString() coverUrl?: string
+  @IsOptional()
+  @IsString()
+  coverUrl?: string
   @ApiProperty({ description: '是否公开', required: false, default: false })
-  @IsOptional() @IsBoolean() isPublic?: boolean
+  @IsOptional()
+  @IsBoolean()
+  isPublic?: boolean
 }
 
 class UpdateCollectionDto {
@@ -25,9 +43,11 @@ class UpdateCollectionDto {
 
 class AddItemDto {
   @ApiProperty({ description: '资源 URL' })
-  @IsString() resourceUrl!: string
+  @IsString()
+  resourceUrl!: string
   @ApiProperty({ description: '资源标题' })
-  @IsString() title!: string
+  @IsString()
+  title!: string
   @IsOptional() @IsString() source?: string
   @IsOptional() @IsString() fileType?: string
 }
@@ -57,7 +77,11 @@ export class CollectionController {
 
   @Patch(':id')
   @ApiOperation({ summary: '更新合集' })
-  update(@CurrentUser('sub') userId: string, @Param('id', ParseIntPipe) id: number, @Body() dto: UpdateCollectionDto) {
+  update(
+    @CurrentUser('sub') userId: string,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateCollectionDto,
+  ) {
     return this.service.update(BigInt(userId), BigInt(id), dto)
   }
 
@@ -69,13 +93,21 @@ export class CollectionController {
 
   @Get(':id/items')
   @ApiOperation({ summary: '合集内资源列表' })
-  listItems(@CurrentUser('sub') userId: string, @Param('id', ParseIntPipe) id: number, @Query() dto: PageDto) {
+  listItems(
+    @CurrentUser('sub') userId: string,
+    @Param('id', ParseIntPipe) id: number,
+    @Query() dto: PageDto,
+  ) {
     return this.service.listItems(BigInt(userId), BigInt(id), dto.page, dto.pageSize)
   }
 
   @Post(':id/items')
   @ApiOperation({ summary: '添加资源到合集' })
-  addItem(@CurrentUser('sub') userId: string, @Param('id', ParseIntPipe) id: number, @Body() dto: AddItemDto) {
+  addItem(
+    @CurrentUser('sub') userId: string,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: AddItemDto,
+  ) {
     return this.service.addItem(BigInt(userId), BigInt(id), dto)
   }
 

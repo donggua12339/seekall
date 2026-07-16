@@ -3,28 +3,30 @@ import { ConfigService } from '@nestjs/config'
 import { Provider, SearchQuery, SearchResult } from '../../interfaces/provider.interface'
 
 /**
- * TG 频道 Provider
- * 通过 PanSou API 的 src=channel 参数，专门搜索 TG 频道资源
+ * PanSou 镜像 Provider
  *
- * 与 PansouProvider 的区别：
- *   - PansouProvider: src=all（频道 + 插件），覆盖所有网盘
- *   - TgChannelProvider: src=channel，仅 TG 频道，结果更精准
+ * 与主 PansouProvider 的区别：
+ *   - 主 PansouProvider 用 PANSOU_API_URLS（默认 so.252035.xyz）
+ *   - 本 Provider 用 PANSOU_MIRROR_URLS（用户自建或第三方镜像）
  *
- * 用于：
- *   - 用户想专门搜索 TG 频道分享的资源
- *   - 作为 PansouProvider 的补充（当插件源失效时，TG 频道可能仍有结果）
+ * 用途：
+ *   - 分散 PanSou 单点依赖，主源失败时镜像源可能可用
+ *   - 用户自建 PanSou 实例后配置 PANSOU_MIRROR_URLS 即可接入
+ *   - 不与主 PansouProvider 重复（URL 列表独立）
+ *
+ * 配置：
+ *   PANSOU_MIRROR_URLS=https://my-pansou.example.com,https://pansou2.example.com
+ *   留空则禁用本 Provider
  */
 @Injectable()
-export class TgChannelProvider implements Provider {
-  private readonly logger = new Logger(TgChannelProvider.name)
-  readonly name = 'tg-channel'
-  readonly displayName = 'TG 频道'
-  readonly category = 'tg' as const
+export class PansouMirrorProvider implements Provider {
+  private readonly logger = new Logger(PansouMirrorProvider.name)
+  readonly name = 'pansou-mirror'
+  readonly displayName = 'PanSou 镜像'
+  readonly category = 'netdisk' as const
 
   private readonly apiUrls: string[]
-  private readonly apiKey?: string
   private readonly timeout: number
-  private readonly maxRetries = 0
 
   private readonly cloudTypeMap: Record<string, string> = {
     baidu: '百度网盘',
@@ -42,48 +44,29 @@ export class TgChannelProvider implements Provider {
   }
 
   constructor(private readonly configService: ConfigService) {
-    const urls = this.configService.get<string>('PANSOU_API_URLS', '')
-    const singleUrl = this.configService.get<string>('PANSOU_API_URL', 'https://so.252035.xyz')
+    const urls = this.configService.get<string>('PANSOU_MIRROR_URLS', '')
     this.apiUrls = urls
       ? urls
           .split(',')
           .map((u) => u.trim())
           .filter(Boolean)
-      : [singleUrl]
-    this.apiKey = this.configService.get<string>('PANSOU_API_KEY')
-    this.timeout = this.configService.get<number>('PANSOU_TIMEOUT', 5000)
+      : []
+    this.timeout = this.configService.get<number>('PANSOU_MIRROR_TIMEOUT', 4000)
   }
 
   get enabled(): boolean {
-    // 默认禁用（PansouProvider 的 src=all 已包含 TG 频道结果，重复调用浪费）
-    // 需要时在 .env 设置 TG_CHANNEL_ENABLED=true
-    return (
-      this.apiUrls.length > 0 &&
-      this.configService.get<string>('TG_CHANNEL_ENABLED', 'false') === 'true'
-    )
+    return this.apiUrls.length > 0
   }
 
   async search(query: SearchQuery): Promise<SearchResult[]> {
     if (!this.enabled) return []
 
     for (const apiUrl of this.apiUrls) {
-      const results = await this.searchWithRetry(apiUrl, query)
-      if (results.length > 0) {
-        return results
-      }
-    }
-    return []
-  }
-
-  private async searchWithRetry(apiUrl: string, query: SearchQuery): Promise<SearchResult[]> {
-    for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
       try {
-        // 用 POST 方式（比 GET 稳定）
         const url = new URL('/api/search', apiUrl)
         const body = {
           kw: query.keyword,
           res: 'merge',
-          src: 'channel', // 仅 TG 频道
           ...(query.page ? { page: query.page } : {}),
         }
 
@@ -96,7 +79,6 @@ export class TgChannelProvider implements Provider {
             Accept: 'application/json',
             'Content-Type': 'application/json',
             'User-Agent': 'SeekAll/0.1.0',
-            ...(this.apiKey ? { Authorization: `Bearer ${this.apiKey}` } : {}),
           },
           body: JSON.stringify(body),
           signal: controller.signal,
@@ -108,23 +90,14 @@ export class TgChannelProvider implements Provider {
           throw new Error(`HTTP ${response.status}`)
         }
 
-        const contentType = response.headers.get('content-type') || ''
-        if (!contentType.includes('application/json')) {
-          throw new Error(`Non-JSON response: ${contentType}`)
-        }
-
         const data = await response.json()
-        return this.transform(data)
+        const results = this.transform(data)
+        if (results.length > 0) return results
       } catch (err) {
-        const msg = (err as Error).message
-        this.logger.debug(`TG channel ${apiUrl} attempt ${attempt + 1} failed: ${msg}`)
-        if (attempt === this.maxRetries) {
-          this.logger.warn(`TG channel ${apiUrl} exhausted retries: ${msg}`)
-          return []
-        }
-        await new Promise((resolve) => setTimeout(resolve, 1000))
+        this.logger.debug(`Mirror ${apiUrl} failed: ${(err as Error).message}`)
       }
     }
+
     return []
   }
 
@@ -174,19 +147,13 @@ export class TgChannelProvider implements Provider {
   async healthCheck(): Promise<boolean> {
     for (const apiUrl of this.apiUrls) {
       try {
-        const response = await fetch(
-          new URL('/api/search?kw=test&src=channel', apiUrl).toString(),
-          {
-            headers: { Accept: 'application/json' },
-            signal: AbortSignal.timeout(5000),
-          },
-        )
-        if (
-          response.ok &&
-          (response.headers.get('content-type') || '').includes('application/json')
-        ) {
-          return true
-        }
+        const response = await fetch(new URL('/api/search', apiUrl).toString(), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ kw: 'test', res: 'merge' }),
+          signal: AbortSignal.timeout(3000),
+        })
+        if (response.ok) return true
       } catch {
         // try next
       }

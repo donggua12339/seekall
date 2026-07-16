@@ -15,6 +15,7 @@
 <script setup lang="ts">
 import { NInputNumber, NButton, NDataTable, NSpace, useMessage } from 'naive-ui'
 import { ref, reactive, onMounted, h } from 'vue'
+import type { TableRow } from '~/types/table'
 
 const { api } = useApi()
 const message = useMessage()
@@ -23,7 +24,7 @@ const generateCount = ref(10)
 const generating = ref(false)
 const exporting = ref(false)
 const loading = ref(false)
-const codes = ref<unknown[]>([])
+const codes = ref<TableRow[]>([])
 const pagination = reactive({ page: 1, pageSize: 20, itemCount: 0 })
 
 const columns = [
@@ -35,8 +36,8 @@ const columns = [
   {
     title: '操作',
     key: 'actions',
-    render: (row: { id: bigint; status: string }) =>
-      row.status === 'unused'
+    render: (row: TableRow) =>
+      String(row.status) === 'unused'
         ? h(
             NButton,
             { size: 'small', quaternary: true, onClick: () => disableCode(row.id) },
@@ -49,7 +50,7 @@ const columns = [
 async function load() {
   loading.value = true
   try {
-    const data = await api.get<{ list: unknown[]; total: number }>('/admin/invite-codes', {
+    const data = await api.get<{ list: TableRow[]; total: number }>('/admin/invite-codes', {
       page: pagination.page,
       pageSize: pagination.pageSize,
     })
@@ -93,7 +94,7 @@ async function exportCodes() {
   }
 }
 
-async function disableCode(id: bigint) {
+async function disableCode(id: string) {
   try {
     await api.patch(`/admin/invite-codes/${id}/disable`)
     message.success('已禁用')

@@ -79,13 +79,15 @@ export class DownloadService {
   /**
    * 获取活跃下载列表
    */
-  async listActive(): Promise<Array<{
-    gid: string
-    status: string
-    totalLength: string
-    completedLength: string
-    downloadSpeed: string
-  }>> {
+  async listActive(): Promise<
+    Array<{
+      gid: string
+      status: string
+      totalLength: string
+      completedLength: string
+      downloadSpeed: string
+    }>
+  > {
     const params = [`token:${this.secret}`]
     const result = await this.rpc('aria2.tellActive', params)
     return result.result as never

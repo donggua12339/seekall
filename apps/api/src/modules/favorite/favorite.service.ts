@@ -8,9 +8,7 @@ export class FavoriteService {
   constructor(private readonly prisma: PrismaService) {}
 
   async list(userId: bigint, page: number, pageSize: number, collectionId?: bigint) {
-    const where = collectionId
-      ? { userId, collectionId }
-      : { userId }
+    const where = collectionId ? { userId, collectionId } : { userId }
     const [list, total] = await Promise.all([
       this.prisma.favorite.findMany({
         where,
@@ -24,14 +22,17 @@ export class FavoriteService {
     return { list, total, page, pageSize, totalPages: Math.ceil(total / pageSize) }
   }
 
-  async add(userId: bigint, data: {
-    resourceUrl: string
-    title: string
-    source: string
-    category?: string
-    resourceMeta?: unknown
-    collectionId?: bigint
-  }) {
+  async add(
+    userId: bigint,
+    data: {
+      resourceUrl: string
+      title: string
+      source: string
+      category?: string
+      resourceMeta?: unknown
+      collectionId?: bigint
+    },
+  ) {
     try {
       return await this.prisma.favorite.create({
         data: {

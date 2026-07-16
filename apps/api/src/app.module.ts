@@ -27,6 +27,7 @@ import { RecommendationModule } from './modules/recommendation/recommendation.mo
 import { SubtitleModule } from './modules/subtitle/subtitle.module'
 import { DownloadModule } from './modules/download/download.module'
 import { CollectionModule } from './modules/collection/collection.module'
+import { TgAlertModule } from './modules/tg-alert/tg-alert.module'
 import { ScheduledTasksService } from './workers/scheduled-tasks.service'
 import { envValidation } from './config/env.validation'
 
@@ -84,6 +85,7 @@ import { envValidation } from './config/env.validation'
     SubtitleModule,
     DownloadModule,
     CollectionModule,
+    TgAlertModule,
   ],
   providers: [ScheduledTasksService],
 })

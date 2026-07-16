@@ -49,13 +49,10 @@ export class LinkCheckerController {
     return this.service.getStatus(dto.url)
   }
 
-  @ApiBearerAuth()
+  @Public()
   @Post('vote')
-  @ApiOperation({ summary: '资源有效性投票（有效/失效）' })
-  async vote(
-    @Body() dto: VoteDto,
-    @CurrentUser('sub') userId?: string,
-  ) {
+  @ApiOperation({ summary: '资源有效性投票（有效/失效，公开）' })
+  async vote(@Body() dto: VoteDto, @CurrentUser('sub') userId?: string) {
     const urlHash = createHash('md5').update(dto.url).digest('hex')
     const key = `votes:${urlHash}`
 

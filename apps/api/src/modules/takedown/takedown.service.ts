@@ -14,11 +14,7 @@ export class TakedownService {
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
   ) {}
 
-  async report(data: {
-    reporterEmail: string
-    resourceUrl: string
-    reason: string
-  }) {
+  async report(data: { reporterEmail: string; resourceUrl: string; reason: string }) {
     if (!data.reporterEmail || !data.reporterEmail.trim()) {
       throw new BusinessException(ErrorCode.PARAM_ERROR, 400, '举报邮箱不能为空')
     }

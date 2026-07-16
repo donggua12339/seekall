@@ -39,32 +39,38 @@ export class QuarkProvider implements Provider {
   }
 
   get enabled(): boolean {
-    // 只要 PanSou API 可用就启用（不强制要求 Cookie）
-    return this.configService.get<string>('PANSOU_API_URL') !== undefined
+    // 默认禁用（PansouProvider 的 src=all 已包含夸克结果，重复调用浪费）
+    // 需要时在 .env 设置 QUARK_ENABLED=true
+    return this.configService.get<string>('QUARK_ENABLED', 'false') === 'true'
   }
 
   async search(query: SearchQuery): Promise<SearchResult[]> {
     if (!this.enabled) return []
 
     try {
+      // 用 POST 方式（比 GET 稳定）
       const url = new URL('/api/search', this.apiUrl)
-      url.searchParams.set('kw', query.keyword)
-      url.searchParams.set('src', 'plugin')
-      url.searchParams.set('plugins', this.pluginName)
-      url.searchParams.set('res', 'merge')
-      url.searchParams.set('cloud_types', 'quark')
-      if (query.page) url.searchParams.set('page', String(query.page))
+      const body = {
+        kw: query.keyword,
+        src: 'plugin',
+        plugins: this.pluginName,
+        res: 'merge',
+        cloud_types: 'quark',
+        ...(query.page ? { page: query.page } : {}),
+      }
 
       const controller = new AbortController()
       const timer = setTimeout(() => controller.abort(), this.timeout)
 
       const response = await fetch(url.toString(), {
-        method: 'GET',
+        method: 'POST',
         headers: {
           Accept: 'application/json',
+          'Content-Type': 'application/json',
           'User-Agent': 'SeekAll/0.1.0',
           ...(this.cookie ? { Cookie: this.cookie } : {}),
         },
+        body: JSON.stringify(body),
         signal: controller.signal,
       })
 
@@ -86,13 +92,16 @@ export class QuarkProvider implements Provider {
     const result: SearchResult[] = []
     const payload = data as {
       data?: {
-        merged_by_type?: Record<string, Array<{
-          url: string
-          note?: string
-          password?: string
-          datetime?: string
-          source?: string
-        }>>
+        merged_by_type?: Record<
+          string,
+          Array<{
+            url: string
+            note?: string
+            password?: string
+            datetime?: string
+            source?: string
+          }>
+        >
         results?: Array<{
           title: string
           content?: string

@@ -11,12 +11,7 @@ export class MembershipCodeService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async generateBatch(
-    count: number,
-    durationDays: number,
-    createdById: bigint,
-    expiresAt?: Date,
-  ) {
+  async generateBatch(count: number, durationDays: number, createdById: bigint, expiresAt?: Date) {
     if (count < 1 || count > 1000) {
       throw new BusinessException(ErrorCode.PARAM_ERROR, 400, '数量必须在 1-1000 之间')
     }

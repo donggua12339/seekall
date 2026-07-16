@@ -1,4 +1,6 @@
 // 觅源 SeekAll - Nuxt 3 配置
+import { presetUno } from 'unocss'
+
 export default defineNuxtConfig({
   compatibilityDate: '2024-07-13',
   devtools: { enabled: true },
@@ -38,6 +40,9 @@ export default defineNuxtConfig({
     // 公开（前端可用）
     public: {
       apiBase: process.env.NUXT_PUBLIC_API_BASE || '/api/v1',
+      // SSE 目标地址：留空时前端用 window.location.origin（同源，避免 CSP 跨域阻止）
+      // 生产可显式设为 https://seekall.winmelon.cn 走 Caddy 反代
+      sseBase: process.env.NUXT_PUBLIC_SSE_BASE || '',
       domain: process.env.APP_DOMAIN || 'localhost',
       adminDomain: process.env.ADMIN_DOMAIN || 'localhost',
     },
@@ -72,10 +77,7 @@ export default defineNuxtConfig({
   },
 
   unocss: {
-    presets: [
-      'uno',
-      // Naive UI 兼容
-    ],
+    presets: [presetUno()],
     shortcuts: {
       'flex-center': 'flex items-center justify-center',
       'flex-between': 'flex items-center justify-between',
@@ -85,6 +87,21 @@ export default defineNuxtConfig({
   typescript: {
     strict: true,
     typeCheck: false, // CI 时单独跑 typecheck
+  },
+
+  // Vite 配置：转译 CJS-only 依赖（naive-ui / vueuc），避免 SSR 阶段 ESM/CJS 兼容错误
+  vite: {
+    optimizeDeps: {
+      include: ['vueuc', 'naive-ui'],
+    },
+    ssr: {
+      noExternal: ['vueuc', 'naive-ui'],
+    },
+  },
+
+  // Nitro 构建配置：转译 naive-ui 组件避免 SSR ESM 报错
+  build: {
+    transpile: ['vueuc', 'naive-ui'],
   },
 
   nitro: {
@@ -103,6 +120,10 @@ export default defineNuxtConfig({
       },
     },
   },
+
+  // 组件自动注册：所有 components/ 下文件不带目录前缀
+  // （默认 InviteCodeManager.vue 在 components/admin/ 下会被命名为 AdminInviteCodeManager）
+  components: [{ path: '~/components', pathPrefix: false }],
 
   // 生产环境关闭 sourcemap
   sourcemap: { server: false, client: false },

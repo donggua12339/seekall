@@ -21,6 +21,7 @@
 <script setup lang="ts">
 import { NInputNumber, NButton, NDataTable, NSpace, useMessage } from 'naive-ui'
 import { ref, reactive, onMounted } from 'vue'
+import type { TableRow } from '~/types/table'
 
 const { api } = useApi()
 const message = useMessage()
@@ -30,7 +31,7 @@ const durationDays = ref(30)
 const generating = ref(false)
 const exporting = ref(false)
 const loading = ref(false)
-const codes = ref<unknown[]>([])
+const codes = ref<TableRow[]>([])
 const pagination = reactive({ page: 1, pageSize: 20, itemCount: 0 })
 
 const columns = [
@@ -44,7 +45,7 @@ const columns = [
 async function load() {
   loading.value = true
   try {
-    const data = await api.get<{ list: unknown[]; total: number }>('/admin/membership-codes', {
+    const data = await api.get<{ list: TableRow[]; total: number }>('/admin/membership-codes', {
       page: pagination.page,
       pageSize: pagination.pageSize,
     })

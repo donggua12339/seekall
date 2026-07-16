@@ -7,6 +7,8 @@ import { TgChannelProvider } from './providers/tg-channel/tg-channel.provider'
 import { TgDirectProvider } from './providers/tg-direct/tg-direct.provider'
 import { ForumProvider } from './providers/forum/forum.provider'
 import { DhtProvider } from './providers/dht/dht.provider'
+import { PansouMirrorProvider } from './providers/pansou-mirror/pansou-mirror.provider'
+import { JackettProvider } from './providers/jackett/jackett.provider'
 import { Provider } from './interfaces/provider.interface'
 
 @Module({
@@ -19,6 +21,8 @@ import { Provider } from './interfaces/provider.interface'
     TgDirectProvider,
     ForumProvider,
     DhtProvider,
+    PansouMirrorProvider,
+    JackettProvider,
     {
       provide: 'PROVIDERS',
       useFactory: (
@@ -29,7 +33,19 @@ import { Provider } from './interfaces/provider.interface'
         tgDirect: TgDirectProvider,
         forum: ForumProvider,
         dht: DhtProvider,
-      ): Provider[] => [pansou, magnet, quark, tgChannel, tgDirect, forum, dht],
+        pansouMirror: PansouMirrorProvider,
+        jackett: JackettProvider,
+      ): Provider[] => [
+        pansou,
+        magnet,
+        quark,
+        tgChannel,
+        tgDirect,
+        forum,
+        dht,
+        pansouMirror,
+        jackett,
+      ],
       inject: [
         PansouProvider,
         MagnetProvider,
@@ -38,6 +54,8 @@ import { Provider } from './interfaces/provider.interface'
         TgDirectProvider,
         ForumProvider,
         DhtProvider,
+        PansouMirrorProvider,
+        JackettProvider,
       ],
     },
   ],

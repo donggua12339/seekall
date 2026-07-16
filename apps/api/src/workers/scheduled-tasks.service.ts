@@ -61,10 +61,7 @@ export class ScheduledTasksService {
 
       // 连续 3 次失败上报 Sentry
       if (this.healthCheckFailures >= 3) {
-        Sentry.captureMessage(
-          `Services degraded: ${JSON.stringify(result.services)}`,
-          'warning',
-        )
+        Sentry.captureMessage(`Services degraded: ${JSON.stringify(result.services)}`, 'warning')
       }
     } catch (err) {
       this.healthCheckFailures++
@@ -77,16 +74,14 @@ export class ScheduledTasksService {
 
   /**
    * 每小时整点预热热门搜索关键词
-   * 从最近 7 天搜索日志统计 top 20，预缓存结果
+   * 从最近 7 天搜索日志统计 top 100，预缓存结果 + 填充 Meilisearch 索引
    */
   @Cron(CronExpression.EVERY_HOUR)
   async warmupPopularSearches() {
     try {
-      const result = await this.searchService.warmupPopularKeywords(20)
+      const result = await this.searchService.warmupPopularKeywords(100)
       if (result.total > 0) {
-        this.logger.log(
-          `Popular search warmup: ${result.succeeded}/${result.total} succeeded`,
-        )
+        this.logger.log(`Popular search warmup: ${result.succeeded}/${result.total} succeeded`)
       }
     } catch (err) {
       this.logger.error(`Popular search warmup failed: ${(err as Error).message}`)
@@ -158,6 +153,39 @@ export class ScheduledTasksService {
       }
     } catch (err) {
       this.logger.error(`Provider auto-recover failed: ${(err as Error).message}`)
+    }
+  }
+
+  /**
+   * 每 5 分钟检查搜索 0 结果率
+   * 最近 10 分钟内 0 结果率 > 50% 时告警
+   */
+  @Cron('*/5 * * * *')
+  async checkSearchQuality() {
+    if (!this.prisma.isAvailable()) return
+    try {
+      const since = new Date(Date.now() - 10 * 60 * 1000)
+      const total = await this.prisma.searchLog.count({ where: { createdAt: { gte: since } } })
+      if (total < 10) return // 样本太少不告警
+
+      const zeroResults = await this.prisma.searchLog.count({
+        where: { createdAt: { gte: since }, resultCount: 0 },
+      })
+
+      const rate = zeroResults / total
+      if (rate > 0.5) {
+        const msg = `搜索 0 结果率 ${(rate * 100).toFixed(1)}% (${zeroResults}/${total}) 超过 50%`
+        this.logger.warn(msg)
+        // 通过全局 emitter 通知 TG Bot
+        const emitter = (
+          globalThis as { __seekallEmitter?: { emit: (e: string, d: unknown) => void } }
+        ).__seekallEmitter
+        if (emitter) {
+          emitter.emit('search:high-zero-rate', { rate, window: '10min' })
+        }
+      }
+    } catch (err) {
+      this.logger.debug(`Search quality check failed: ${(err as Error).message}`)
     }
   }
 }

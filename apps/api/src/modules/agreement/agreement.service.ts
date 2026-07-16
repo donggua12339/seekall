@@ -15,7 +15,10 @@ export class AgreementService {
     return this.prisma.agreement.findUnique({ where: { version } })
   }
 
-  async create(data: { version: string; content: string; effectiveDate: Date }, _createdById: bigint) {
+  async create(
+    data: { version: string; content: string; effectiveDate: Date },
+    _createdById: bigint,
+  ) {
     return this.prisma.agreement.create({
       data: {
         version: data.version,

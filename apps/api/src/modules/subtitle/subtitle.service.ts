@@ -24,7 +24,11 @@ export class SubtitleService {
     return !!this.apiKey
   }
 
-  async search(keyword: string, language: string = 'zh,en', limit: number = 10): Promise<SubtitleResult[]> {
+  async search(
+    keyword: string,
+    language: string = 'zh,en',
+    limit: number = 10,
+  ): Promise<SubtitleResult[]> {
     if (!this.enabled) {
       this.logger.debug('OpenSubtitles API key not configured')
       return []

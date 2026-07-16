@@ -13,6 +13,7 @@
 <script setup lang="ts">
 import { NInput, NButton, NDataTable, useMessage } from 'naive-ui'
 import { ref, onMounted, h } from 'vue'
+import type { TableRow } from '~/types/table'
 
 const { api } = useApi()
 const message = useMessage()
@@ -20,7 +21,7 @@ const message = useMessage()
 const newKeyword = ref('')
 const newCategory = ref('')
 const loading = ref(false)
-const keywords = ref<unknown[]>([])
+const keywords = ref<TableRow[]>([])
 
 const columns = [
   { title: 'ID', key: 'id' },
@@ -30,7 +31,7 @@ const columns = [
   {
     title: '操作',
     key: 'actions',
-    render: (row: { id: bigint }) =>
+    render: (row: TableRow) =>
       h(
         NButton,
         { size: 'small', type: 'error', quaternary: true, onClick: () => removeKeyword(row.id) },
@@ -42,7 +43,7 @@ const columns = [
 async function load() {
   loading.value = true
   try {
-    const data = await api.get<{ list: unknown[] }>('/admin/blocked-keywords', {
+    const data = await api.get<{ list: TableRow[] }>('/admin/blocked-keywords', {
       page: 1,
       pageSize: 100,
     })
@@ -68,7 +69,7 @@ async function addKeyword() {
   }
 }
 
-async function removeKeyword(id: bigint) {
+async function removeKeyword(id: string) {
   try {
     await api.delete(`/admin/blocked-keywords/${id}`)
     message.success('已删除')

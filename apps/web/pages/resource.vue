@@ -18,7 +18,10 @@
       </div>
 
       <!-- 提取码 -->
-      <div v-if="password" class="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded flex items-center gap-3">
+      <div
+        v-if="password"
+        class="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded flex items-center gap-3"
+      >
         <span class="text-sm text-yellow-700 dark:text-yellow-300">提取码：</span>
         <code class="text-lg font-mono font-bold">{{ password }}</code>
         <n-button size="small" @click="copyPassword">复制</n-button>
@@ -46,9 +49,7 @@
 
       <!-- 操作按钮 -->
       <div class="flex gap-2 flex-wrap">
-        <n-button type="primary" tag="a" :href="resource.url" target="_blank">
-          打开链接
-        </n-button>
+        <n-button type="primary" tag="a" :href="resource.url" target="_blank"> 打开链接 </n-button>
         <n-button @click="copyLink">复制链接</n-button>
         <n-button @click="addToFavorite">收藏</n-button>
         <n-button @click="showShareCard = true">生成分享卡片</n-button>
@@ -96,18 +97,17 @@ definePageMeta({ ssr: false })
 useHead({ title: '资源详情' })
 
 const route = useRoute()
-const router = useRouter()
 const { api } = useApi()
 const message = useMessage()
 
 const showShareCard = ref(false)
 
-// 从 URL query 解析资源信息（base64 编码）
+// 从 URL query 解析资源信息（encodeURIComponent + base64 编码）
 const resource = computed<Resource | null>(() => {
   try {
     const data = route.query.data as string
     if (!data) return null
-    return JSON.parse(atob(decodeURIComponent(data))) as Resource
+    return JSON.parse(decodeURIComponent(atob(data))) as Resource
   } catch {
     return null
   }

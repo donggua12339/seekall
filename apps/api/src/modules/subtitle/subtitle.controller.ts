@@ -16,7 +16,10 @@ class SubtitleQueryDto {
   language?: string
 
   @ApiProperty({ description: '返回条数', required: false, default: 10 })
-  @IsInt() @Min(1) @Max(30) limit: number = 10
+  @IsInt()
+  @Min(1)
+  @Max(30)
+  limit: number = 10
 }
 
 @ApiTags('字幕')

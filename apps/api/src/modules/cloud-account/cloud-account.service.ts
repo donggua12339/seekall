@@ -136,7 +136,11 @@ export class CloudAccountService {
           body: JSON.stringify({ share_id: shareId, passcode: passcode || '' }),
         },
       )
-      const tokenData = (await tokenRes.json()) as { status: number; data?: { stoken: string }; message?: string }
+      const tokenData = (await tokenRes.json()) as {
+        status: number
+        data?: { stoken: string }
+        message?: string
+      }
       if (tokenData.status !== 200 || !tokenData.data?.stoken) {
         throw new Error(tokenData.message || '获取 share token 失败（Cookie 可能过期）')
       }
@@ -201,7 +205,11 @@ export class CloudAccountService {
       }
     } catch (err) {
       this.logger.error(`Quark transfer failed: ${(err as Error).message}`)
-      throw new BusinessException(ErrorCode.INTERNAL_ERROR, 500, `夸克转存失败: ${(err as Error).message}`)
+      throw new BusinessException(
+        ErrorCode.INTERNAL_ERROR,
+        500,
+        `夸克转存失败: ${(err as Error).message}`,
+      )
     }
   }
 

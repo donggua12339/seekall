@@ -21,10 +21,15 @@ import { MailModule } from '../mail/mail.module'
     MailModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, GithubStrategy, {
-    provide: APP_GUARD,
-    useClass: JwtAuthGuard,
-  }],
+  providers: [
+    AuthService,
+    JwtStrategy,
+    GithubStrategy,
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
+    },
+  ],
   exports: [AuthService],
 })
 export class AuthModule {}

@@ -36,7 +36,6 @@ export class RecommendationService {
    * 4. 去重 + 按相关度排序
    */
   async recommendForUser(userId: bigint, limit: number = 10): Promise<RecommendResult> {
-
     if (!this.prisma.isAvailable()) {
       return { items: [], basedOn: [] }
     }

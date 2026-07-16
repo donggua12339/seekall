@@ -99,4 +99,10 @@ export class AdminController {
   auditLogs(@Query() dto: ListUsersDto) {
     return this.service.auditLogs(dto.page, dto.pageSize)
   }
+
+  @Get('search-quality')
+  @ApiOperation({ summary: '搜索质量看板（0 结果率/P50/P95/热门 0 结果词）' })
+  searchQuality() {
+    return this.service.searchQuality()
+  }
 }

@@ -1,9 +1,8 @@
-import { Controller, Get, Query, Res, UseGuards } from '@nestjs/common'
+import { Controller, Get, Query, Res, Logger } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger'
 import { FastifyReply } from 'fastify'
 import { SearchService } from './search.service'
 import { ProviderService } from '../provider/provider.service'
-import { ApiKeyAuthGuard } from '../api-key/api-key-auth.guard'
 import { CurrentUser } from '../../common/decorators/current-user.decorator'
 import { Public } from '../../common/decorators/public.decorator'
 import { IsString, IsOptional, IsInt, Min, Max } from 'class-validator'
@@ -61,13 +60,14 @@ class SuggestQueryDto {
 @ApiBearerAuth()
 @Controller('search')
 export class SearchController {
+  private readonly logger = new Logger(SearchController.name)
+
   constructor(
     private readonly searchService: SearchService,
     private readonly providerService: ProviderService,
   ) {}
 
   @Public()
-  @UseGuards(ApiKeyAuthGuard)
   @Get()
   @ApiOperation({ summary: '实时搜索资源（聚合多 Provider，支持过滤/排序）' })
   search(@Query() dto: SearchQueryDto, @CurrentUser() user?: { sub: string }) {
@@ -88,15 +88,10 @@ export class SearchController {
   @Get('suggest')
   @ApiOperation({ summary: '搜索建议（热门词 + 用户历史联想）' })
   suggest(@Query() dto: SuggestQueryDto, @CurrentUser() user?: { sub: string }) {
-    return this.searchService.suggest(
-      dto.keyword,
-      dto.limit,
-      user?.sub ? BigInt(user.sub) : null,
-    )
+    return this.searchService.suggest(dto.keyword, dto.limit, user?.sub ? BigInt(user.sub) : null)
   }
 
   @Public()
-  @UseGuards(ApiKeyAuthGuard)
   @Get('fuzzy')
   @ApiOperation({ summary: '模糊搜索（本地 Meilisearch 索引，支持拼音/分词/容错）' })
   fuzzy(@Query() dto: SearchQueryDto) {
@@ -104,7 +99,6 @@ export class SearchController {
   }
 
   @Public()
-  @UseGuards(ApiKeyAuthGuard)
   @Get('combined')
   @ApiOperation({ summary: '组合搜索（实时 + 模糊索引合并去重）' })
   async combined(@Query() dto: SearchQueryDto, @CurrentUser() user?: { sub: string }) {
@@ -146,16 +140,17 @@ export class SearchController {
   }
 
   @Public()
-  @UseGuards(ApiKeyAuthGuard)
   @Get('stream')
   @ApiOperation({ summary: '流式搜索（SSE，Provider 完成即推送）' })
   async stream(@Query() dto: SearchQueryDto, @Res() reply: FastifyReply) {
-    // SSE 响应头
+    // SSE 响应头（含 CORS，因为 reply.raw.writeHead 绕过了 @fastify/cors）
     reply.raw.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
       Connection: 'keep-alive',
       'X-Accel-Buffering': 'no', // Nginx/Caddy 禁用缓冲
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Credentials': 'true',
     })
 
     const send = (event: string, data: unknown) => {
@@ -163,31 +158,58 @@ export class SearchController {
       reply.raw.write(`data: ${JSON.stringify(data)}\n\n`)
     }
 
-    if (!dto.keyword?.trim()) {
-      send('error', { message: '关键词不能为空' })
+    try {
+      if (!dto.keyword?.trim()) {
+        send('error', { message: '关键词不能为空' })
+        reply.raw.end()
+        return
+      }
+
+      let totalResults = 0
+
+      send('start', {
+        keyword: dto.keyword,
+        providers: this.providerService.getActiveProviders().map((p) => p.name),
+      })
+
+      const { errors, durationMs, allResults } = await this.providerService.streamSearch(
+        { keyword: dto.keyword, page: dto.page, pageSize: dto.pageSize },
+        (provider, results) => {
+          totalResults += results.length
+          send('partial', { provider, results, count: results.length })
+        },
+        (provider, error) => {
+          send('provider-error', { provider, error })
+        },
+      )
+
+      // 缓存最终结果（供下次同样关键词的普通搜索命中缓存）
+      await this.searchService.cacheStreamResult(
+        dto.keyword,
+        dto.page || 1,
+        dto.pageSize || 20,
+        allResults,
+        durationMs,
+        errors,
+      )
+
+      send('complete', { total: totalResults, errors, durationMs })
       reply.raw.end()
-      return
+    } catch (err) {
+      // 任何异常都推给前端并正常结束流，避免连接卡死
+      const message = (err as Error).message || '流式搜索失败'
+      this.logger.error(`SSE stream failed: ${message}`)
+      try {
+        send('error', { message })
+        send('complete', { total: 0, errors: [message], durationMs: 0 })
+      } catch {
+        // 发送失败说明连接已断
+      }
+      try {
+        reply.raw.end()
+      } catch {
+        // ignore
+      }
     }
-
-    let totalResults = 0
-
-    send('start', {
-      keyword: dto.keyword,
-      providers: this.providerService.getActiveProviders().map((p) => p.name),
-    })
-
-    const { errors, durationMs } = await this.providerService.streamSearch(
-      { keyword: dto.keyword, page: dto.page, pageSize: dto.pageSize },
-      (provider, results) => {
-        totalResults += results.length
-        send('partial', { provider, results, count: results.length })
-      },
-      (provider, error) => {
-        send('provider-error', { provider, error })
-      },
-    )
-
-    send('complete', { total: totalResults, errors, durationMs })
-    reply.raw.end()
   }
 }

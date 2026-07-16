@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Delete, Post, Patch, Param, ParseIntPipe, Query } from '@nestjs/common'
+import {
+  Body,
+  Controller,
+  Get,
+  Delete,
+  Post,
+  Patch,
+  Param,
+  ParseIntPipe,
+  Query,
+} from '@nestjs/common'
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger'
 import { FavoriteService } from './favorite.service'
 import { CurrentUser } from '../../common/decorators/current-user.decorator'
@@ -61,7 +71,11 @@ export class FavoriteController {
 
   @Patch(':id/move')
   @ApiOperation({ summary: '移动收藏到指定分组' })
-  move(@CurrentUser('sub') userId: string, @Param('id', ParseIntPipe) id: number, @Body() dto: MoveDto) {
+  move(
+    @CurrentUser('sub') userId: string,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: MoveDto,
+  ) {
     return this.service.moveToCollection(
       BigInt(userId),
       BigInt(id),

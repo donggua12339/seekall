@@ -150,18 +150,18 @@ describe('AuthService', () => {
 
     it('数据库不可用应抛异常', async () => {
       prisma.isAvailable = () => false
-      await expect(
-        service.githubAuth({ id: '12345', username: 'test' }),
-      ).rejects.toThrow(BusinessException)
+      await expect(service.githubAuth({ id: '12345', username: 'test' })).rejects.toThrow(
+        BusinessException,
+      )
     })
   })
 
   describe('bindGithub', () => {
     it('GitHub 已被其他用户绑定应抛异常', async () => {
       prisma.user.findUnique.mockResolvedValue({ id: 2n, username: 'other' })
-      await expect(
-        service.bindGithub(1n, { id: '12345', username: 'test' }),
-      ).rejects.toThrow(BusinessException)
+      await expect(service.bindGithub(1n, { id: '12345', username: 'test' })).rejects.toThrow(
+        BusinessException,
+      )
     })
 
     it('未绑定时应成功绑定', async () => {

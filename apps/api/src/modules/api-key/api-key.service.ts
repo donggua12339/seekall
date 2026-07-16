@@ -63,7 +63,9 @@ export class ApiKeyService {
       },
     })
 
-    this.logger.log(`API Key created: user ${userId}, name "${name}", prefix ${prefix}, scopes [${scopes.join(',')}]`)
+    this.logger.log(
+      `API Key created: user ${userId}, name "${name}", prefix ${prefix}, scopes [${scopes.join(',')}]`,
+    )
 
     return { key: rawKey, id: apiKey.id, prefix, scopes }
   }
@@ -117,7 +119,9 @@ export class ApiKeyService {
    * 验证 API Key（通过明文 key 查找用户）
    * 返回 userId + scopes，未找到返回 null
    */
-  async validate(rawKey: string): Promise<{ userId: bigint; apiKeyId: bigint; scopes: string[] } | null> {
+  async validate(
+    rawKey: string,
+  ): Promise<{ userId: bigint; apiKeyId: bigint; scopes: string[] } | null> {
     if (!this.prisma.isAvailable()) return null
     if (!rawKey.startsWith('sk_') || rawKey.length < 10) return null
 

@@ -5,7 +5,6 @@ import { ErrorCode } from '../../common/constants/error-codes'
 
 @Injectable()
 export class CollectionService {
-
   constructor(private readonly prisma: PrismaService) {}
 
   async list(userId: bigint, page: number = 1, pageSize: number = 20) {
@@ -22,7 +21,10 @@ export class CollectionService {
     return { list, total, page, pageSize, totalPages: Math.ceil(total / pageSize) }
   }
 
-  async create(userId: bigint, data: { title: string; description?: string; coverUrl?: string; isPublic?: boolean }) {
+  async create(
+    userId: bigint,
+    data: { title: string; description?: string; coverUrl?: string; isPublic?: boolean },
+  ) {
     if (!this.prisma.isAvailable()) {
       throw new BusinessException(ErrorCode.INTERNAL_ERROR, 503)
     }
@@ -40,7 +42,11 @@ export class CollectionService {
     })
   }
 
-  async update(userId: bigint, id: bigint, data: { title?: string; description?: string; coverUrl?: string; isPublic?: boolean }) {
+  async update(
+    userId: bigint,
+    id: bigint,
+    data: { title?: string; description?: string; coverUrl?: string; isPublic?: boolean },
+  ) {
     const collection = await this.prisma.collection.findUnique({ where: { id } })
     if (!collection || collection.userId !== userId) {
       throw new BusinessException(ErrorCode.NOT_FOUND, 404, '合集不存在')
@@ -65,7 +71,11 @@ export class CollectionService {
     return { message: '已删除' }
   }
 
-  async addItem(userId: bigint, collectionId: bigint, item: { resourceUrl: string; title: string; source?: string; fileType?: string }) {
+  async addItem(
+    userId: bigint,
+    collectionId: bigint,
+    item: { resourceUrl: string; title: string; source?: string; fileType?: string },
+  ) {
     const collection = await this.prisma.collection.findUnique({ where: { id: collectionId } })
     if (!collection || collection.userId !== userId) {
       throw new BusinessException(ErrorCode.NOT_FOUND, 404, '合集不存在')

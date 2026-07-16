@@ -1,9 +1,4 @@
-import {
-  CanActivate,
-  ExecutionContext,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common'
+import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 import { JwtService } from '@nestjs/jwt'
 import { FastifyRequest } from 'fastify'
@@ -50,7 +45,10 @@ export class JwtAuthGuard implements CanActivate {
       context.getHandler(),
       context.getClass(),
     ])
-    if (requiredRoles && !requiredRoles.includes((request as unknown as { user: JwtPayload }).user.role)) {
+    if (
+      requiredRoles &&
+      !requiredRoles.includes((request as unknown as { user: JwtPayload }).user.role)
+    ) {
       throw new BusinessException(ErrorCode.FORBIDDEN, 403)
     }
 

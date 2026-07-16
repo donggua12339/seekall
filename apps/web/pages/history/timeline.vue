@@ -2,7 +2,7 @@
   <div class="container mx-auto px-4 py-8 max-w-3xl">
     <div class="flex-between mb-6">
       <h1 class="text-2xl font-bold">搜索历史时间线</h1>
-      <n-button size="small" quaternary type="error" @click="clearAll" :loading="clearing">
+      <n-button size="small" quaternary type="error" :loading="clearing" @click="clearAll">
         清空历史
       </n-button>
     </div>
@@ -41,7 +41,7 @@
 
     <!-- 加载更多 -->
     <div v-if="hasMore" class="text-center mt-6">
-      <n-button @click="loadMore" :loading="loadingMore">加载更多</n-button>
+      <n-button :loading="loadingMore" @click="loadMore">加载更多</n-button>
     </div>
   </div>
 </template>

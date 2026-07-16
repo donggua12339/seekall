@@ -75,6 +75,7 @@
 import { NTabs, NTabPane, NStatistic, NDataTable, NButton } from 'naive-ui'
 import { ref, onMounted } from 'vue'
 import { useAuthStore } from '~/stores/auth'
+import type { TableRow } from '~/types/table'
 
 definePageMeta({ layout: 'admin' })
 useHead({ title: '管理后台' })
@@ -88,11 +89,11 @@ const dashboard = ref<{
   searches: { today: number }
   takedown: { pending: number }
 } | null>(null)
-const users = ref<unknown[]>([])
+const users = ref<TableRow[]>([])
 const loadingUsers = ref(false)
 const userPagination = ref({ page: 1, pageSize: 20, itemCount: 0 })
 
-const auditLogs = ref<unknown[]>([])
+const auditLogs = ref<TableRow[]>([])
 const loadingAudit = ref(false)
 
 const userColumns = [
@@ -103,13 +104,13 @@ const userColumns = [
   {
     title: '付费',
     key: 'isPaid',
-    render: (row: { isPaid: boolean }) => (row.isPaid ? '是' : '否'),
+    render: (row: TableRow) => (row.isPaid ? '是' : '否'),
   },
   { title: '状态', key: 'status' },
   {
     title: '注册时间',
     key: 'createdAt',
-    render: (row: { createdAt: string }) => new Date(row.createdAt).toLocaleString(),
+    render: (row: TableRow) => new Date(String(row.createdAt)).toLocaleString(),
   },
 ]
 
@@ -117,7 +118,7 @@ const auditColumns = [
   {
     title: '时间',
     key: 'createdAt',
-    render: (row: { createdAt: string }) => new Date(row.createdAt).toLocaleString(),
+    render: (row: TableRow) => new Date(String(row.createdAt)).toLocaleString(),
   },
   { title: '管理员', key: 'admin.username' },
   { title: '操作', key: 'action' },
@@ -143,7 +144,7 @@ async function loadDashboard() {
 async function loadUsers() {
   loadingUsers.value = true
   try {
-    const data = await api.get<{ list: unknown[]; total: number }>('/admin/users', {
+    const data = await api.get<{ list: TableRow[]; total: number }>('/admin/users', {
       page: userPagination.value.page,
       pageSize: userPagination.value.pageSize,
     })
@@ -157,7 +158,7 @@ async function loadUsers() {
 async function loadAuditLogs() {
   loadingAudit.value = true
   try {
-    const data = await api.get<{ list: unknown[] }>('/admin/audit-logs', { page: 1, pageSize: 50 })
+    const data = await api.get<{ list: TableRow[] }>('/admin/audit-logs', { page: 1, pageSize: 50 })
     auditLogs.value = data.list
   } finally {
     loadingAudit.value = false

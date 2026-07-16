@@ -11,9 +11,12 @@ describe('QuarkProvider', () => {
       QUARK_COOKIE: undefined,
       QUARK_TIMEOUT: 5000,
       QUARK_PANSOU_PLUGIN: 'qupansou',
+      QUARK_ENABLED: 'true',
     }
     configService = {
-      get: jest.fn().mockImplementation((key: string, defaultValue?: unknown) => config[key] ?? defaultValue),
+      get: jest
+        .fn()
+        .mockImplementation((key: string, defaultValue?: unknown) => config[key] ?? defaultValue),
     } as unknown as jest.Mocked<ConfigService>
 
     provider = new QuarkProvider(configService)
@@ -32,7 +35,7 @@ describe('QuarkProvider', () => {
       expect(provider.category).toBe('netdisk')
     })
 
-    it('PANSOU_API_URL 配置时应该启用', () => {
+    it('QUARK_ENABLED=true 时应该启用', () => {
       expect(provider.enabled).toBe(true)
     })
   })
@@ -68,7 +71,8 @@ describe('QuarkProvider', () => {
       }
 
       global.fetch = jest.fn().mockResolvedValue({
-        ok: true, headers: { get: () => 'application/json' },
+        ok: true,
+        headers: { get: () => 'application/json' },
         json: () => Promise.resolve(mockResponse),
       }) as unknown as typeof fetch
 
@@ -96,7 +100,8 @@ describe('QuarkProvider', () => {
       }
 
       global.fetch = jest.fn().mockResolvedValue({
-        ok: true, headers: { get: () => 'application/json' },
+        ok: true,
+        headers: { get: () => 'application/json' },
         json: () => Promise.resolve(mockResponse),
       }) as unknown as typeof fetch
 
@@ -118,7 +123,8 @@ describe('QuarkProvider', () => {
       }
 
       global.fetch = jest.fn().mockResolvedValue({
-        ok: true, headers: { get: () => 'application/json' },
+        ok: true,
+        headers: { get: () => 'application/json' },
         json: () => Promise.resolve(mockResponse),
       }) as unknown as typeof fetch
 
@@ -145,7 +151,8 @@ describe('QuarkProvider', () => {
       }
 
       global.fetch = jest.fn().mockResolvedValue({
-        ok: true, headers: { get: () => 'application/json' },
+        ok: true,
+        headers: { get: () => 'application/json' },
         json: () => Promise.resolve(mockResponse),
       }) as unknown as typeof fetch
 
@@ -168,7 +175,9 @@ describe('QuarkProvider', () => {
     })
 
     it('网络错误时返回空数组', async () => {
-      global.fetch = jest.fn().mockRejectedValue(new Error('Network error')) as unknown as typeof fetch
+      global.fetch = jest
+        .fn()
+        .mockRejectedValue(new Error('Network error')) as unknown as typeof fetch
 
       const results = await provider.search({ keyword: '测试', page: 1, pageSize: 20 })
       expect(results).toEqual([])
@@ -176,7 +185,8 @@ describe('QuarkProvider', () => {
 
     it('响应无 data 字段时返回空数组', async () => {
       global.fetch = jest.fn().mockResolvedValue({
-        ok: true, headers: { get: () => 'application/json' },
+        ok: true,
+        headers: { get: () => 'application/json' },
         json: () => Promise.resolve({ code: 0 }),
       }) as unknown as typeof fetch
 

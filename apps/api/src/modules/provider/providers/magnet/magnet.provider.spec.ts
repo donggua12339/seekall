@@ -9,9 +9,12 @@ describe('MagnetProvider', () => {
     const config: Record<string, unknown> = {
       MAGNET_SITE_URL: 'https://bt4gprx.com',
       MAGNET_TIMEOUT: 5000,
+      MAGNET_ENABLED: 'true',
     }
     configService = {
-      get: jest.fn().mockImplementation((key: string, defaultValue?: unknown) => config[key] ?? defaultValue),
+      get: jest
+        .fn()
+        .mockImplementation((key: string, defaultValue?: unknown) => config[key] ?? defaultValue),
     } as unknown as jest.Mocked<ConfigService>
 
     provider = new MagnetProvider(configService)
@@ -30,13 +33,24 @@ describe('MagnetProvider', () => {
       expect(provider.category).toBe('magnet')
     })
 
-    it('默认应该启用', () => {
+    it('MAGNET_ENABLED=true 且 URL 非空时应该启用', () => {
       expect(provider.enabled).toBe(true)
+    })
+
+    it('MAGNET_ENABLED=false 时应该禁用', () => {
+      configService.get = jest.fn().mockImplementation((key: string) => {
+        if (key === 'MAGNET_SITE_URL') return 'https://bt4gprx.com'
+        if (key === 'MAGNET_ENABLED') return 'false'
+        return undefined
+      })
+      const p = new MagnetProvider(configService)
+      expect(p.enabled).toBe(false)
     })
 
     it('MAGNET_SITE_URL 为空字符串时应该禁用', () => {
       configService.get = jest.fn().mockImplementation((key: string) => {
         if (key === 'MAGNET_SITE_URL') return ''
+        if (key === 'MAGNET_ENABLED') return 'true'
         return undefined
       })
       const p = new MagnetProvider(configService)
@@ -68,7 +82,8 @@ describe('MagnetProvider', () => {
         </rss>`
 
       global.fetch = jest.fn().mockResolvedValue({
-        ok: true, headers: { get: () => 'application/json' },
+        ok: true,
+        headers: { get: () => 'application/json' },
         text: () => Promise.resolve(mockXml),
       }) as unknown as typeof fetch
 
@@ -99,7 +114,8 @@ describe('MagnetProvider', () => {
         </channel></rss>`
 
       global.fetch = jest.fn().mockResolvedValue({
-        ok: true, headers: { get: () => 'application/json' },
+        ok: true,
+        headers: { get: () => 'application/json' },
         text: () => Promise.resolve(mockXml),
       }) as unknown as typeof fetch
 
@@ -118,7 +134,8 @@ describe('MagnetProvider', () => {
         </channel></rss>`
 
       global.fetch = jest.fn().mockResolvedValue({
-        ok: true, headers: { get: () => 'application/json' },
+        ok: true,
+        headers: { get: () => 'application/json' },
         text: () => Promise.resolve(mockXml),
       }) as unknown as typeof fetch
 
@@ -130,7 +147,8 @@ describe('MagnetProvider', () => {
 
     it('应该处理空 XML', async () => {
       global.fetch = jest.fn().mockResolvedValue({
-        ok: true, headers: { get: () => 'application/json' },
+        ok: true,
+        headers: { get: () => 'application/json' },
         text: () => Promise.resolve('<?xml version="1.0"?><rss></rss>'),
       }) as unknown as typeof fetch
 
@@ -151,7 +169,9 @@ describe('MagnetProvider', () => {
     })
 
     it('网络错误时应该返回空数组', async () => {
-      global.fetch = jest.fn().mockRejectedValue(new Error('Network error')) as unknown as typeof fetch
+      global.fetch = jest
+        .fn()
+        .mockRejectedValue(new Error('Network error')) as unknown as typeof fetch
 
       const results = await provider.search({ keyword: '测试', page: 1, pageSize: 20 })
       expect(results).toEqual([])

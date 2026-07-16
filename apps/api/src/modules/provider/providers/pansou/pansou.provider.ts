@@ -24,7 +24,8 @@ export class PansouProvider implements Provider {
   private readonly apiUrls: string[]
   private readonly apiKey?: string
   private readonly timeout: number
-  private readonly maxRetries = 2
+  // 不重试：PanSou API 不稳定时直接 fallback 到 Meilisearch 索引，避免拖慢响应
+  private readonly maxRetries = 0
 
   // PanSou cloud_type -> SeekAll category 映射
   private readonly cloudTypeMap: Record<string, string> = {
@@ -53,7 +54,8 @@ export class PansouProvider implements Provider {
           .filter(Boolean)
       : [singleUrl]
     this.apiKey = this.configService.get<string>('PANSOU_API_KEY')
-    this.timeout = this.configService.get<number>('PANSOU_TIMEOUT', 10000)
+    // 单次请求超时 4s（留余量给 ProviderService 全局 12s 超时 + 1 次重试）
+    this.timeout = this.configService.get<number>('PANSOU_TIMEOUT', 4000)
   }
 
   get enabled(): boolean {
@@ -79,22 +81,26 @@ export class PansouProvider implements Provider {
   private async searchWithRetry(apiUrl: string, query: SearchQuery): Promise<SearchResult[]> {
     for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
       try {
+        // 用 POST 方式（比 GET 稳定，避免 Cloudflare 拦截和 URL 编码问题）
         const url = new URL('/api/search', apiUrl)
-        url.searchParams.set('kw', query.keyword)
-        url.searchParams.set('res', 'merge')
-        url.searchParams.set('src', 'all')
-        if (query.page) url.searchParams.set('page', String(query.page))
+        const body = {
+          kw: query.keyword,
+          res: 'merge',
+          ...(query.page ? { page: query.page } : {}),
+        }
 
         const controller = new AbortController()
         const timer = setTimeout(() => controller.abort(), this.timeout)
 
         const response = await fetch(url.toString(), {
-          method: 'GET',
+          method: 'POST',
           headers: {
             Accept: 'application/json',
+            'Content-Type': 'application/json',
             'User-Agent': 'SeekAll/0.1.0 (https://github.com/seekall)',
             ...(this.apiKey ? { Authorization: `Bearer ${this.apiKey}` } : {}),
           },
+          body: JSON.stringify(body),
           signal: controller.signal,
         })
 
@@ -111,7 +117,7 @@ export class PansouProvider implements Provider {
         }
 
         const data = await response.json()
-        const results = this.transform(data)
+        const results = this.transform(data, query.keyword)
         if (results.length > 0) {
           return results
         }
@@ -134,7 +140,7 @@ export class PansouProvider implements Provider {
     return []
   }
 
-  private transform(data: unknown): SearchResult[] {
+  private transform(data: unknown, keyword: string): SearchResult[] {
     const result: SearchResult[] = []
     const payload = data as {
       code?: number
@@ -163,14 +169,44 @@ export class PansouProvider implements Provider {
 
     if (!payload?.data) return []
 
+    // 关键词相关性过滤（严格版）：
+    // 1) 有中文子串时，标题必须包含至少 1 个 3+ 字连续子串
+    // 2) 否则回退到 token 匹配：长关键词 >=3 token 要求 2 个命中，短关键词要求 1 个
+    const tokens = this.extractTokens(keyword)
+    const chineseSubstrings = this.extractChineseSubstrings(keyword)
+    const isLongKeyword = tokens.length >= 3
+    const minTokenMatches = isLongKeyword ? 2 : 1
+
+    const isRelevant = (title: string): boolean => {
+      if (tokens.length === 0 || !title) return true
+      const lowerTitle = title.toLowerCase()
+
+      // 中文关键词：必须命中至少一个 3+ 字子串（确保 "我的世界辅助" 不会匹配 "我的世界大电影"）
+      if (chineseSubstrings.length > 0) {
+        const hasSubstring = chineseSubstrings.some((s) => lowerTitle.includes(s.toLowerCase()))
+        if (!hasSubstring) return false
+        return true
+      }
+
+      // 纯英文/数字关键词：回退到 token 匹配
+      const matchCount = tokens.reduce(
+        (acc, t) => (lowerTitle.includes(t.toLowerCase()) ? acc + 1 : acc),
+        0,
+      )
+      return matchCount >= minTokenMatches
+    }
+
     // 优先用 merged_by_type
     if (payload.data.merged_by_type) {
       for (const [cloudType, items] of Object.entries(payload.data.merged_by_type)) {
         if (!Array.isArray(items)) continue
         for (const item of items) {
           if (!item.url) continue
+          const title = item.note || `${this.cloudTypeMap[cloudType] || cloudType} 资源`
+          // 相关性过滤：note 为空或包含关键词 token 才保留
+          if (item.note && !isRelevant(item.note)) continue
           result.push({
-            title: item.note || `${this.cloudTypeMap[cloudType] || cloudType} 资源`,
+            title,
             url: item.url,
             source: this.name,
             sourceDisplayName: this.displayName,
@@ -192,6 +228,8 @@ export class PansouProvider implements Provider {
     if (payload.data.results && Array.isArray(payload.data.results)) {
       for (const r of payload.data.results) {
         if (!r.links || r.links.length === 0) continue
+        // 相关性过滤
+        if (r.title && !isRelevant(r.title)) continue
         for (const link of r.links) {
           if (!link.url) continue
           result.push({
@@ -217,6 +255,37 @@ export class PansouProvider implements Provider {
     return result
   }
 
+  /**
+   * 提取关键词 token：中文 2-gram + 英文/数字 token (>=2 字符)
+   */
+  private extractTokens(keyword: string): string[] {
+    const tokens: string[] = []
+    const trimmed = keyword.trim().toLowerCase()
+    if (!trimmed) return tokens
+
+    const englishParts = trimmed.match(/[a-z0-9]{2,}/g) || []
+    tokens.push(...englishParts)
+
+    const chineseChars = trimmed.match(/[\u4e00-\u9fa5]/g) || []
+    for (let i = 0; i < chineseChars.length - 1; i++) {
+      tokens.push(chineseChars[i] + chineseChars[i + 1])
+    }
+    if (chineseChars.length > 0 && chineseChars.length < 3) {
+      tokens.push(...chineseChars)
+    }
+
+    return Array.from(new Set(tokens)).filter((t) => t.length >= 2)
+  }
+
+  /**
+   * 提取关键词中连续的中文字符片段（>=3 字）
+   */
+  private extractChineseSubstrings(keyword: string): string[] {
+    const trimmed = keyword.trim()
+    if (!trimmed) return []
+    return trimmed.match(/[\u4e00-\u9fa5]{3,}/g) || []
+  }
+
   async healthCheck(): Promise<boolean> {
     for (const apiUrl of this.apiUrls) {
       try {
@@ -225,7 +294,10 @@ export class PansouProvider implements Provider {
           headers: { Accept: 'application/json' },
           signal: AbortSignal.timeout(5000),
         })
-        if (response.ok && (response.headers.get('content-type') || '').includes('application/json')) {
+        if (
+          response.ok &&
+          (response.headers.get('content-type') || '').includes('application/json')
+        ) {
           return true
         }
       } catch {

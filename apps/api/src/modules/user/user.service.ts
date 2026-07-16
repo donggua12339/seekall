@@ -22,18 +22,21 @@ export class UserService {
     return safe
   }
 
-  async updateProfile(userId: bigint, updates: {
-    avatarUrl?: string
-    bio?: string
-    preferences?: {
-      theme?: string
-      language?: string
-      searchPageSize?: number
-      safeSearch?: boolean
-      preferredCategories?: string[]
-      preferredProviders?: string[]
-    }
-  }) {
+  async updateProfile(
+    userId: bigint,
+    updates: {
+      avatarUrl?: string
+      bio?: string
+      preferences?: {
+        theme?: string
+        language?: string
+        searchPageSize?: number
+        safeSearch?: boolean
+        preferredCategories?: string[]
+        preferredProviders?: string[]
+      }
+    },
+  ) {
     if (updates.preferences) {
       await this.prisma.userPreference.upsert({
         where: { userId },
@@ -48,11 +51,21 @@ export class UserService {
         },
         update: {
           ...(updates.preferences.theme !== undefined && { theme: updates.preferences.theme }),
-          ...(updates.preferences.language !== undefined && { language: updates.preferences.language }),
-          ...(updates.preferences.searchPageSize !== undefined && { searchPageSize: updates.preferences.searchPageSize }),
-          ...(updates.preferences.safeSearch !== undefined && { safeSearch: updates.preferences.safeSearch }),
-          ...(updates.preferences.preferredCategories !== undefined && { preferredCategories: updates.preferences.preferredCategories }),
-          ...(updates.preferences.preferredProviders !== undefined && { preferredProviders: updates.preferences.preferredProviders }),
+          ...(updates.preferences.language !== undefined && {
+            language: updates.preferences.language,
+          }),
+          ...(updates.preferences.searchPageSize !== undefined && {
+            searchPageSize: updates.preferences.searchPageSize,
+          }),
+          ...(updates.preferences.safeSearch !== undefined && {
+            safeSearch: updates.preferences.safeSearch,
+          }),
+          ...(updates.preferences.preferredCategories !== undefined && {
+            preferredCategories: updates.preferences.preferredCategories,
+          }),
+          ...(updates.preferences.preferredProviders !== undefined && {
+            preferredProviders: updates.preferences.preferredProviders,
+          }),
         },
       })
     }
@@ -88,7 +101,10 @@ export class UserService {
     return { message: '账号已注销，30 天后用户名将被释放' }
   }
 
-  async activateMembership(userId: bigint, code: string): Promise<{ message: string; paidUntil: Date | null }> {
+  async activateMembership(
+    userId: bigint,
+    code: string,
+  ): Promise<{ message: string; paidUntil: Date | null }> {
     const membershipCode = await this.prisma.membershipCode.findUnique({
       where: { code },
     })

@@ -4,8 +4,14 @@
       <h1 class="text-2xl font-bold">资源图墙</h1>
       <div class="flex items-center gap-2">
         <n-input-group>
-          <n-input v-model:value="keyword" placeholder="搜索资源..." @keyup.enter="doSearch" clearable size="small" />
-          <n-button size="small" type="primary" @click="doSearch" :loading="loading">搜索</n-button>
+          <n-input
+            v-model:value="keyword"
+            placeholder="搜索资源..."
+            clearable
+            size="small"
+            @keyup.enter="doSearch"
+          />
+          <n-button size="small" type="primary" :loading="loading" @click="doSearch">搜索</n-button>
         </n-input-group>
       </div>
     </div>
@@ -18,12 +24,7 @@
     </div>
 
     <div v-else-if="items.length > 0" class="gallery-grid">
-      <div
-        v-for="item in items"
-        :key="item.url"
-        class="gallery-card"
-        @click="goToDetail(item)"
-      >
+      <div v-for="item in items" :key="item.url" class="gallery-card" @click="goToDetail(item)">
         <!-- 封面图 -->
         <div class="gallery-cover">
           <img
@@ -92,10 +93,10 @@ const keyword = ref((route.query.q as string) || '')
 const loading = ref(false)
 const items = ref<SearchResultItem[]>([])
 
-function getImage(item: SearchResultItem): string | null {
+function getImage(item: SearchResultItem): string | undefined {
   const images = item.resourceMeta?.images
   if (images && images.length > 0) return images[0]
-  return null
+  return undefined
 }
 
 function getCategoryIcon(item: SearchResultItem): string {

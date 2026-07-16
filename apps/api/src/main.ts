@@ -53,7 +53,38 @@ async function bootstrap() {
   await app.register(fastifyCookie as never, {
     secret: configService.get<string>('JWT_REFRESH_SECRET'),
   })
-  await app.register(fastifyHelmet as never)
+  // Helmet CSP：必须显式声明 connect-src，否则 EventSource 跨端口/跨域会被浏览器静默阻止
+  // - dev: 允许 localhost:7301（API 端口）
+  // - prod: 允许主域名 + 当前 origin
+  // - 'self' 已包含同源；额外白名单用于 SSE 直连场景
+  await app.register(fastifyHelmet as never, {
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        baseUri: ["'self'"],
+        fontSrc: ["'self'", 'https:', 'data:'],
+        formAction: ["'self'"],
+        frameAncestors: ["'self'"],
+        imgSrc: ["'self'", 'data:'],
+        objectSrc: ["'none'"],
+        scriptSrc: ["'self'"],
+        scriptSrcAttr: ["'none'"],
+        styleSrc: ["'self'", 'https:', "'unsafe-inline'"],
+        // SSE / fetch / XHR 允许的目标：同源 + 开发 API 端口 + 生产主域
+        connectSrc: [
+          "'self'",
+          'http://localhost:7301',
+          'https://seekall.winmelon.cn',
+          'https://admin.seekall.winmelon.cn',
+          ...(configService.get<string>('NODE_ENV') === 'development'
+            ? ['ws:', 'http://localhost:*', 'http://127.0.0.1:*']
+            : []),
+        ],
+        upgradeInsecureRequests: [],
+      },
+    },
+    crossOriginEmbedderPolicy: false,
+  })
 
   // 全局管道
   app.useGlobalPipes(

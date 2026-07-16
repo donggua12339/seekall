@@ -61,6 +61,26 @@ async function main() {
     console.log('Initial agreement created: v1.0.0')
   }
 
+  // 2. 初始化关键词黑名单（NSFW / 违规 / 侵权高发词）
+  const blockedKeywords = [
+    '色情', '成人', 'av 下载', '裸聊', '换脸', '偷拍',
+    '破解版', '盗版', '激活码', '注册机', '去水印',
+    '赌博', '菠菜', '彩票预测',
+    '暴力', '恐怖主义', '毒品',
+  ]
+  for (const kw of blockedKeywords) {
+    const exists = await prisma.blockedKeyword.findUnique({ where: { keyword: kw } })
+    if (!exists) {
+      await prisma.blockedKeyword.create({
+        data: {
+          keyword: kw,
+          reason: 'seed-initial',
+        },
+      })
+    }
+  }
+  console.log(`Blocked keywords ensured: ${blockedKeywords.length}`)
+
   console.log('Seed completed')
 }
 

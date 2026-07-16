@@ -17,10 +17,7 @@ describe('SearchService', () => {
   beforeEach(() => {
     providerService = {
       searchAll: jest.fn(),
-      getActiveProviders: jest.fn().mockReturnValue([
-        { name: 'pansou' },
-        { name: 'magnet' },
-      ]),
+      getActiveProviders: jest.fn().mockReturnValue([{ name: 'pansou' }, { name: 'magnet' }]),
     }
     prisma = {
       isAvailable: jest.fn().mockReturnValue(true),
@@ -74,26 +71,20 @@ describe('SearchService', () => {
       }),
     }
 
-    service = new SearchService(
-      providerService,
-      prisma,
-      meilisearchService,
-      configService,
-      redis,
-    )
+    service = new SearchService(providerService, prisma, meilisearchService, configService, redis)
   })
 
   describe('search - 参数校验', () => {
     it('空关键词应抛异常', async () => {
-      await expect(
-        service.search({ keyword: '', page: 1, pageSize: 20 }, null),
-      ).rejects.toThrow(BusinessException)
+      await expect(service.search({ keyword: '', page: 1, pageSize: 20 }, null)).rejects.toThrow(
+        BusinessException,
+      )
     })
 
     it('纯空格关键词应抛异常', async () => {
-      await expect(
-        service.search({ keyword: '   ', page: 1, pageSize: 20 }, null),
-      ).rejects.toThrow(BusinessException)
+      await expect(service.search({ keyword: '   ', page: 1, pageSize: 20 }, null)).rejects.toThrow(
+        BusinessException,
+      )
     })
 
     it('关键词超过 100 字符应抛异常', async () => {
@@ -120,10 +111,7 @@ describe('SearchService', () => {
         durationMs: 1000,
       })
 
-      const result = await service.search(
-        { keyword: '测试', page: 1, pageSize: 20 },
-        null,
-      )
+      const result = await service.search({ keyword: '测试', page: 1, pageSize: 20 }, null)
 
       expect(result.total).toBe(1)
       expect(result.list[0].title).toBe('测试资源')
@@ -158,11 +146,7 @@ describe('SearchService', () => {
 
       await service.search({ keyword: '空结果测试', page: 1, pageSize: 20 }, null)
       // 空结果用 CACHE_TTL_EMPTY = 30s
-      expect(redis.setex).toHaveBeenCalledWith(
-        expect.any(String),
-        30,
-        expect.any(String),
-      )
+      expect(redis.setex).toHaveBeenCalledWith(expect.any(String), 30, expect.any(String))
     })
 
     it('缓存命中时直接返回缓存结果', async () => {
@@ -178,10 +162,7 @@ describe('SearchService', () => {
       }
       redis.get.mockResolvedValue(JSON.stringify(cached))
 
-      const result = await service.search(
-        { keyword: '缓存测试', page: 1, pageSize: 20 },
-        null,
-      )
+      const result = await service.search({ keyword: '缓存测试', page: 1, pageSize: 20 }, null)
 
       expect(result.total).toBe(1)
       expect(result.list[0].title).toBe('缓存结果')
@@ -212,9 +193,7 @@ describe('SearchService', () => {
       })
 
       await service.search({ keyword: '测试', page: -1, pageSize: 20 }, null)
-      expect(providerService.searchAll).toHaveBeenCalledWith(
-        expect.objectContaining({ page: 1 }),
-      )
+      expect(providerService.searchAll).toHaveBeenCalledWith(expect.objectContaining({ page: 1 }))
     })
   })
 
@@ -235,10 +214,7 @@ describe('SearchService', () => {
         durationMs: 500,
       })
 
-      const result = await service.search(
-        { keyword: '测试', page: 1, pageSize: 20 },
-        null,
-      )
+      const result = await service.search({ keyword: '测试', page: 1, pageSize: 20 }, null)
 
       expect(result.total).toBe(1)
     })
@@ -260,10 +236,7 @@ describe('SearchService', () => {
         durationMs: 500,
       })
 
-      const result = await service.search(
-        { keyword: '测试', page: 1, pageSize: 20 },
-        null,
-      )
+      const result = await service.search({ keyword: '测试', page: 1, pageSize: 20 }, null)
 
       expect(result.total).toBe(1)
     })

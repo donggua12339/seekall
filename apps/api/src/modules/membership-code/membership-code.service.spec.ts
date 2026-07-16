@@ -80,9 +80,7 @@ describe('MembershipCodeService', () => {
 
   describe('exportUnused', () => {
     it('应返回未使用的激活码列表', async () => {
-      prisma.membershipCode.findMany.mockResolvedValue([
-        { code: 'CODE1', createdAt: new Date() },
-      ])
+      prisma.membershipCode.findMany.mockResolvedValue([{ code: 'CODE1', createdAt: new Date() }])
       const result = await service.exportUnused(1n)
       expect(result).toHaveLength(1)
       expect(result[0].code).toBe('CODE1')
