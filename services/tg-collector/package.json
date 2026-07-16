@@ -1,0 +1,19 @@
+{
+  "name": "@seekall/tg-collector",
+  "version": "0.1.0",
+  "description": "SeekAll TG Collector - Telegram 频道资源收集器",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "dev": "tsx watch src/index.ts"
+  },
+  "dependencies": {
+    "meilisearch": "^0.41.0",
+    "telegram": "^2.20.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.7.0",
+    "typescript": "^5.4.0"
+  }
+}
