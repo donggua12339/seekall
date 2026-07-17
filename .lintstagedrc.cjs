@@ -1,11 +1,10 @@
 // 觅源 SeekAll - lint-staged 配置
-// v0.5: docs-site 是 vitepress 静态站，不参与项目 lint（vitepress 有自己的构建流程）
-// 用函数形式 + filter 精确排除 docs-site 目录
+// v0.5: docs-site 是 vitepress 静态站，packages 是 SDK + 规则包，均不参与项目 lint
 // 路径含空格（Claude Code Haha），每个文件路径必须用引号包起来
 // lint-staged 传的是绝对路径，filter 用 includes 判断
 const isProjectFile = (p) => {
   const n = p.replace(/\\/g, "/");
-  return !n.includes("/apps/docs-site/");
+  return !n.includes("/apps/docs-site/") && !n.includes("/packages/");
 };
 const quote = (p) => `"${p}"`;
 

@@ -16,6 +16,7 @@ module.exports = {
     "dist/",
     "build/",
     "apps/docs-site/",
+    "packages/",
     "*.config.cjs",
     ".lintstagedrc.cjs",
   ],
