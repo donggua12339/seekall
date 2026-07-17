@@ -6,29 +6,11 @@ import { PrismaModule } from './database/prisma.module'
 import { RedisModule } from './database/redis.module'
 import { AuthModule } from './modules/auth/auth.module'
 import { UserModule } from './modules/user/user.module'
-import { InviteCodeModule } from './modules/invite-code/invite-code.module'
-import { MembershipCodeModule } from './modules/membership-code/membership-code.module'
-import { SearchModule } from './modules/search/search.module'
-import { ProviderModule } from './modules/provider/provider.module'
-import { SearchHistoryModule } from './modules/search-history/search-history.module'
-import { FavoriteModule } from './modules/favorite/favorite.module'
-import { TakedownModule } from './modules/takedown/takedown.module'
-import { BlockedKeywordModule } from './modules/blocked-keyword/blocked-keyword.module'
-import { LinkCheckerModule } from './modules/link-checker/link-checker.module'
 import { AdminModule } from './modules/admin/admin.module'
-import { AgreementModule } from './modules/agreement/agreement.module'
+import { RuleModule } from './modules/rule/rule.module'
+import { LicenseModule } from './modules/license/license.module'
 import { HealthModule } from './modules/health/health.module'
-import { ApiKeyModule } from './modules/api-key/api-key.module'
 import { MailModule } from './modules/mail/mail.module'
-import { MeilisearchModule } from './modules/meilisearch/meilisearch.module'
-import { CloudAccountModule } from './modules/cloud-account/cloud-account.module'
-import { SubscriptionModule } from './modules/subscription/subscription.module'
-import { RecommendationModule } from './modules/recommendation/recommendation.module'
-import { SubtitleModule } from './modules/subtitle/subtitle.module'
-import { DownloadModule } from './modules/download/download.module'
-import { CollectionModule } from './modules/collection/collection.module'
-import { TgAlertModule } from './modules/tg-alert/tg-alert.module'
-import { ScheduledTasksService } from './workers/scheduled-tasks.service'
 import { envValidation } from './config/env.validation'
 
 @Module({
@@ -60,33 +42,15 @@ import { envValidation } from './config/env.validation'
     // 基础设施
     PrismaModule,
     RedisModule,
-    MeilisearchModule,
     MailModule,
 
-    // 业务模块
+    // v0.5 业务模块（5 个 + health）
     AuthModule,
     UserModule,
-    InviteCodeModule,
-    MembershipCodeModule,
-    SearchModule,
-    ProviderModule,
-    SearchHistoryModule,
-    FavoriteModule,
-    TakedownModule,
-    BlockedKeywordModule,
-    LinkCheckerModule,
     AdminModule,
-    AgreementModule,
+    RuleModule,
+    LicenseModule,
     HealthModule,
-    ApiKeyModule,
-    CloudAccountModule,
-    SubscriptionModule,
-    RecommendationModule,
-    SubtitleModule,
-    DownloadModule,
-    CollectionModule,
-    TgAlertModule,
   ],
-  providers: [ScheduledTasksService],
 })
 export class AppModule {}

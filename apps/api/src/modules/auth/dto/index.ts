@@ -2,13 +2,6 @@ import { IsString, MinLength, MaxLength, Matches, IsEmail } from 'class-validato
 import { ApiProperty } from '@nestjs/swagger'
 
 export class RegisterDto {
-  @ApiProperty({ description: '邀请码（8 位）', example: 'K7M2P9XQ' })
-  @IsString()
-  @Matches(/^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{8}$/, {
-    message: '邀请码格式无效',
-  })
-  inviteCode!: string
-
   @ApiProperty({ description: '用户名', example: 'seeker' })
   @IsString()
   @MinLength(3)

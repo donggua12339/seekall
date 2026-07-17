@@ -1,40 +1,13 @@
-import { Body, Controller, Get, Patch, Delete, Post, Param } from '@nestjs/common'
+import { Body, Controller, Get, Patch, Delete, Param } from '@nestjs/common'
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger'
 import { UserService } from './user.service'
 import { AuthService } from '../auth/auth.service'
 import { CurrentUser } from '../../common/decorators/current-user.decorator'
-import {
-  IsString,
-  IsOptional,
-  IsInt,
-  Min,
-  Max,
-  IsBoolean,
-  IsArray,
-  ValidateNested,
-} from 'class-validator'
-import { Type } from 'class-transformer'
-
-class PreferencesDto {
-  @IsOptional() @IsString() theme?: string
-  @IsOptional() @IsString() language?: string
-  @IsOptional() @IsInt() @Min(10) @Max(50) searchPageSize?: number
-  @IsOptional() @IsBoolean() safeSearch?: boolean
-  @IsOptional() @IsArray() preferredCategories?: string[]
-  @IsOptional() @IsArray() preferredProviders?: string[]
-}
+import { IsString, IsOptional } from 'class-validator'
 
 class UpdateProfileDto {
   @IsOptional() @IsString() avatarUrl?: string
   @IsOptional() @IsString() bio?: string
-  @IsOptional()
-  @ValidateNested()
-  @Type(() => PreferencesDto)
-  preferences?: PreferencesDto
-}
-
-class ActivateMembershipDto {
-  @IsString() code!: string
 }
 
 @ApiTags('用户')
@@ -62,12 +35,6 @@ export class UserController {
   @ApiOperation({ summary: '注销账号（软删除）' })
   deleteAccount(@CurrentUser('sub') userId: string) {
     return this.userService.deleteAccount(BigInt(userId))
-  }
-
-  @Post('membership/activate')
-  @ApiOperation({ summary: '激活会员' })
-  activateMembership(@CurrentUser('sub') userId: string, @Body() dto: ActivateMembershipDto) {
-    return this.userService.activateMembership(BigInt(userId), dto.code)
   }
 
   @Get('sessions')

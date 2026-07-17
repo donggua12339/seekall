@@ -7,7 +7,6 @@ import { PrismaService } from '../../database/prisma.service'
 import { REDIS_CLIENT } from '../../database/redis.module'
 import { MailService } from '../mail/mail.service'
 import { HashUtil } from '../../common/utils/hash.util'
-import { InviteCodeUtil } from '../../common/utils/invite-code.util'
 import { BusinessException } from '../../common/filters/http-exception.filter'
 import { ErrorCode } from '../../common/constants/error-codes'
 import { JwtPayload } from '../../common/guards/jwt-auth.guard'
@@ -15,7 +14,6 @@ import type Redis from 'ioredis'
 import { User, UserRole, UserStatus } from '@prisma/client'
 
 interface RegisterInput {
-  inviteCode: string
   username: string
   email: string
   password: string
@@ -36,24 +34,8 @@ export class AuthService {
   ) {}
 
   async register(input: RegisterInput): Promise<{ message: string }> {
-    // 校验邀请码
-    const invite = await this.prisma.inviteCode.findUnique({
-      where: { code: input.inviteCode },
-    })
-    if (!invite) {
-      throw new BusinessException(ErrorCode.INVITE_CODE_INVALID)
-    }
-    if (invite.status !== 'unused') {
-      throw new BusinessException(ErrorCode.INVITE_CODE_USED)
-    }
-    if (invite.expiresAt && invite.expiresAt < new Date()) {
-      throw new BusinessException(ErrorCode.INVITE_CODE_EXPIRED)
-    }
-
-    // 校验邀请码格式
-    if (!InviteCodeUtil.isValidFormat(input.inviteCode)) {
-      throw new BusinessException(ErrorCode.INVITE_CODE_INVALID)
-    }
+    // v0.5：邀请码可选（半公开合规路线，不强制邀请）
+    // 保留字段是为兼容 v0.4 客户端，但服务端不再校验
 
     // 校验用户名/邮箱唯一性
     const existsUsername = await this.prisma.user.findUnique({
@@ -87,28 +69,7 @@ export class AuthService {
         role: UserRole.user,
         status: UserStatus.pending_verification,
         emailVerifyToken: verifyToken,
-        inviteCodeUsed: { connect: { id: invite.id } },
-        userAgreements: {
-          create: {
-            agreementVersion: input.agreementVersion,
-          },
-        },
       },
-    })
-
-    // 标记邀请码已使用
-    await this.prisma.inviteCode.update({
-      where: { id: invite.id },
-      data: {
-        status: 'used',
-        usedById: user.id,
-        usedAt: new Date(),
-      },
-    })
-
-    // 创建用户偏好
-    await this.prisma.userPreference.create({
-      data: { userId: user.id },
     })
 
     // 发送验证邮件
@@ -334,109 +295,5 @@ export class AuthService {
 
   private validatePassword(password: string): boolean {
     return password.length >= 8 && /[a-zA-Z]/.test(password) && /\d/.test(password)
-  }
-
-  /**
-   * GitHub OAuth 登录/绑定
-   * - 已绑定 GitHub 的用户：直接登录返回 token
-   * - 未绑定的用户：返回 github profile 信息，前端引导到注册页（仍需邀请码 - Z++ 红线）
-   */
-  async githubAuth(profile: {
-    id: string
-    username: string
-    emails?: Array<{ value: string; verified: boolean }>
-    photos?: Array<{ value: string }>
-  }): Promise<{
-    action: 'login' | 'register'
-    tokens?: { accessToken: string; refreshToken: string }
-    githubProfile?: { id: string; username: string; email?: string; avatar?: string }
-  }> {
-    if (!this.prisma.isAvailable()) {
-      throw new BusinessException(ErrorCode.INTERNAL_ERROR, 503)
-    }
-
-    // 查找已绑定此 GitHub 的用户
-    const existing = await this.prisma.user.findUnique({
-      where: { githubId: profile.id },
-    })
-
-    if (existing && existing.status === 'active') {
-      // 已绑定且活跃 -> 直接登录
-      await this.prisma.user.update({
-        where: { id: existing.id },
-        data: { lastLoginAt: new Date() },
-      })
-      const tokens = await this.issueTokens(existing)
-      this.logger.log(`GitHub login: ${existing.username} (github:${profile.username})`)
-      return { action: 'login', tokens }
-    }
-
-    // 未绑定 -> 返回 profile 让前端走注册流程（需邀请码）
-    const email = profile.emails?.find((e) => e.verified)?.value || profile.emails?.[0]?.value
-    return {
-      action: 'register',
-      githubProfile: {
-        id: profile.id,
-        username: profile.username,
-        email,
-        avatar: profile.photos?.[0]?.value,
-      },
-    }
-  }
-
-  /**
-   * 绑定 GitHub 账号到已有用户（已登录用户在个人主页操作）
-   */
-  async bindGithub(
-    userId: bigint,
-    profile: {
-      id: string
-      username: string
-      emails?: Array<{ value: string; verified: boolean }>
-      photos?: Array<{ value: string }>
-    },
-  ): Promise<{ message: string }> {
-    if (!this.prisma.isAvailable()) {
-      throw new BusinessException(ErrorCode.INTERNAL_ERROR, 503)
-    }
-
-    // 检查是否已被其他用户绑定
-    const existing = await this.prisma.user.findUnique({
-      where: { githubId: profile.id },
-    })
-    if (existing && existing.id !== userId) {
-      throw new BusinessException(ErrorCode.PARAM_ERROR, 400, '该 GitHub 账号已被其他用户绑定')
-    }
-
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: {
-        githubId: profile.id,
-        githubUsername: profile.username,
-        avatarUrl: profile.photos?.[0]?.value || undefined,
-      },
-    })
-
-    this.logger.log(`GitHub bound: user ${userId} -> github:${profile.username}`)
-    return { message: 'GitHub 账号绑定成功' }
-  }
-
-  /**
-   * 解绑 GitHub 账号
-   */
-  async unbindGithub(userId: bigint): Promise<{ message: string }> {
-    if (!this.prisma.isAvailable()) {
-      throw new BusinessException(ErrorCode.INTERNAL_ERROR, 503)
-    }
-
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: {
-        githubId: null,
-        githubUsername: null,
-      },
-    })
-
-    return { message: 'GitHub 账号已解绑' }
   }
 }

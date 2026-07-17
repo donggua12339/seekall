@@ -68,10 +68,6 @@ async function bootstrap() {
       },
     })
 
-    await prisma.userPreference.create({
-      data: { userId: user.id },
-    })
-
     logger.log(`Super admin created: ${user.username} (${user.email})`)
     logger.log('Please keep the password safe. You can now login at /admin')
   } catch (err) {

@@ -1,11 +1,11 @@
-// 觅源 SeekAll - Prisma Schema
+// 觅源 SeekAll v0.5 - Prisma Schema
+// 极简 BaaS：5 张表（User / License / Rule / AuditLog / Config）+ LicenseClaim（防羊毛）
 // 数据库：MySQL 8
 // 命名约定：snake_case 复数表名
 
 generator client {
   provider      = "prisma-client-js"
   // Alpine 镜像（musl libc）需要 linux-musl-openssl-3.0.x 的 Prisma engine binary
-  // 否则部署到 alpine 容器时会报 "degraded mode (no database)"
   binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
@@ -28,42 +28,35 @@ enum UserStatus {
   deleted
 }
 
-enum InviteCodeStatus {
+/// 会员档位：免费 / 试用 / 月卡 / 永久
+enum LicenseTier {
+  trial
+  monthly
+  lifetime
+}
+
+/// License code 状态
+enum LicenseStatus {
   unused
   used
   disabled
 }
 
-enum MembershipCodeStatus {
-  unused
-  used
-  disabled
+/// 规则风险评级（L0-L4）
+enum RuleRiskLevel {
+  l0
+  l1
+  l2
+  l3
+  l4
 }
 
-enum ProviderCategory {
-  netdisk
-  magnet
-  tg
-  forum
-}
-
-enum LinkStatusEnum {
-  unknown
-  active
-  dead
-  checking
-}
-
-enum TakedownStatus {
-  pending
-  resolved
-  rejected
-}
-
-enum SearchLogSource {
-  web
-  api
-  admin
+/// 规则市场状态
+enum RuleStatus {
+  pending_review
+  published
+  taken_down
+  banned
 }
 
 // ====== 用户系统 ======
@@ -76,6 +69,7 @@ model User {
   role               UserRole  @default(user)
   isPaid             Boolean   @default(false) @map("is_paid")
   paidUntil          DateTime? @map("paid_until")
+  tier               LicenseTier? @map("tier")
   status             UserStatus @default(pending_verification)
   bannedReason       String?   @map("banned_reason") @db.VarChar(255)
   badge              String?   @db.VarChar(64)
@@ -85,349 +79,107 @@ model User {
   emailVerifiedAt    DateTime? @map("email_verified_at")
   passwordResetToken String?   @map("password_reset_token") @db.VarChar(64)
   passwordResetExpires DateTime? @map("password_reset_expires")
-  // GitHub OAuth 绑定（v0.2）- null 表示未绑定
-  githubId            String?   @unique @map("github_id") @db.VarChar(64)
-  githubUsername      String?   @map("github_username") @db.VarChar(64)
   lastLoginAt        DateTime? @map("last_login_at")
   deletedAt          DateTime? @map("deleted_at")
   createdAt          DateTime  @default(now()) @map("created_at")
   updatedAt          DateTime  @updatedAt @map("updated_at")
 
-  // 关系
-  preferences        UserPreference?
-  inviteCodeUsed     InviteCode?          @relation("InviteCodeUsedBy")
-  membershipCodesUsed MembershipCode[]    @relation("MembershipCodeUsedBy")
-  membershipCodesCreated MembershipCode[] @relation("MembershipCodeCreatedBy")
-  inviteCodesCreated InviteCode[]         @relation("InviteCodeCreatedBy")
-  blockedKeywordsCreated BlockedKeyword[]
-  searchHistory      SearchHistory[]
-  favorites          Favorite[]
-  favoriteCollections FavoriteCollection[]
-  searchLogs         SearchLog[]
-  takedownRecords    TakedownRecord[]
-  adminLogs          AdminAuditLog[]      @relation("AdminAuditLogAdmin")
-  userAgreements     UserAgreement[]
-  apiKeys            ApiKey[]
-  cloudAccounts      CloudAccount[]
-  subscriptions      Subscription[]
-  collections        Collection[]
+  // v0.5 关系
+  licensesGenerated  License[]     @relation("LicenseGeneratedBy")
+  licensesUsed       License[]     @relation("LicenseUsedBy")
+  licenseClaims      LicenseClaim[]
+  rulesAuthored      Rule[]        @relation("RuleAuthoredBy")
+  auditLogs          AdminAuditLog[] @relation("AdminAuditActor")
 
   @@index([status])
   @@index([isPaid])
-  @@index([deletedAt])
   @@map("users")
 }
 
-model UserPreference {
-  userId              BigInt   @id @db.UnsignedBigInt
-  preferredCategories Json?    @map("preferred_categories")
-  preferredProviders  Json?    @map("preferred_providers")
-  theme               String   @default("auto") @db.VarChar(16)
-  language            String   @default("zh-CN") @db.VarChar(10)
-  searchPageSize      Int      @default(20) @map("search_page_size")
-  safeSearch          Boolean  @default(true) @map("safe_search")
+// ====== 会员授权系统 ======
 
-  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+model License {
+  id           BigInt       @id @default(autoincrement()) @db.UnsignedBigInt
+  code         String       @unique @db.VarChar(32)
+  tier         LicenseTier
+  status       LicenseStatus @default(unused)
+  generatedBy  BigInt?      @map("generated_by") @db.UnsignedBigInt
+  generatedByUser User?    @relation("LicenseGeneratedBy", fields: [generatedBy], references: [id])
+  usedBy       BigInt?      @map("used_by") @db.UnsignedBigInt
+  usedByUser   User?        @relation("LicenseUsedBy", fields: [usedBy], references: [id])
+  usedAt       DateTime?    @map("used_at")
+  note         String?      @db.VarChar(255)
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
 
-  @@map("user_preferences")
-}
+  claims       LicenseClaim[]
 
-// ====== 邀请码 & 会员激活码 ======
-
-model InviteCode {
-  id          BigInt           @id @default(autoincrement()) @db.UnsignedBigInt
-  code        String           @unique @db.VarChar(8)
-  status      InviteCodeStatus @default(unused)
-  createdById BigInt           @map("created_by_id") @db.UnsignedBigInt
-  usedById    BigInt?          @unique @map("used_by_id") @db.UnsignedBigInt
-  usedAt      DateTime?        @map("used_at")
-  expiresAt   DateTime?        @map("expires_at")
-  createdAt   DateTime         @default(now()) @map("created_at")
-
-  createdBy   User             @relation("InviteCodeCreatedBy", fields: [createdById], references: [id])
-  usedBy      User?            @relation("InviteCodeUsedBy", fields: [usedById], references: [id])
-
+  @@index([tier])
   @@index([status])
-  @@index([createdById])
-  @@map("invite_codes")
+  @@index([generatedBy])
+  @@map("licenses")
 }
 
-model MembershipCode {
-  id           BigInt              @id @default(autoincrement()) @db.UnsignedBigInt
-  code         String              @unique @db.VarChar(16)
-  status       MembershipCodeStatus @default(unused)
-  durationDays Int                 @map("duration_days")
-  createdById  BigInt              @map("created_by_id") @db.UnsignedBigInt
-  usedById     BigInt?             @map("used_by_id") @db.UnsignedBigInt
-  usedAt       DateTime?           @map("used_at")
-  expiresAt    DateTime?           @map("expires_at")
-  createdAt    DateTime            @default(now()) @map("created_at")
-
-  createdBy    User                @relation("MembershipCodeCreatedBy", fields: [createdById], references: [id])
-  usedBy       User?               @relation("MembershipCodeUsedBy", fields: [usedById], references: [id])
-
-  @@index([status])
-  @@index([createdById])
-  @@map("membership_codes")
-}
-
-// ====== 搜索相关 ======
-
-model SearchHistory {
-  id          BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
-  userId      BigInt   @map("user_id") @db.UnsignedBigInt
-  query       String   @db.VarChar(255)
-  filters     Json?
-  resultCount Int      @default(0) @map("result_count")
-  createdAt   DateTime @default(now()) @map("created_at")
-
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, createdAt])
-  @@map("search_history")
-}
-
-model SearchLog {
-  id          BigInt          @id @default(autoincrement()) @db.UnsignedBigInt
-  userId      BigInt?         @map("user_id") @db.UnsignedBigInt
-  query       String          @db.VarChar(255)
-  filters     Json?
-  resultCount Int             @default(0) @map("result_count")
-  source      SearchLogSource @default(web)
-  durationMs  Int             @map("duration_ms")
-  createdAt   DateTime        @default(now()) @map("created_at")
-
-  user        User?           @relation(fields: [userId], references: [id])
-
-  @@index([createdAt])
-  @@index([userId])
-  @@index([query, createdAt]) // 热门搜索统计优化
-  @@map("search_logs")
-}
-
-model Favorite {
+/// License 领取记录（用于 trial 防羊毛：每账号限领 1 次试用）
+model LicenseClaim {
   id           BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
   userId       BigInt   @map("user_id") @db.UnsignedBigInt
-  resourceUrl  String   @map("resource_url") @db.VarChar(2048)
-  title        String   @db.VarChar(512)
-  source       String   @db.VarChar(64)
-  category     String?  @db.VarChar(32)
-  resourceMeta Json?    @map("resource_meta")
-  collectionId BigInt?  @map("collection_id") @db.UnsignedBigInt
+  user         User     @relation(fields: [userId], references: [id])
+  licenseId    BigInt   @map("license_id") @db.UnsignedBigInt
+  license      License  @relation(fields: [licenseId], references: [id])
   createdAt    DateTime @default(now()) @map("created_at")
 
-  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  collection  FavoriteCollection? @relation(fields: [collectionId], references: [id], onDelete: SetNull)
-
-  // resource_url 是 VarChar(2048)，utf8mb4 下 2048*4=8192 字节超 3072 索引上限
-  // 改用前缀索引 + 应用层 dedup（FavoriteService.add 已处理）
-  @@index([userId, resourceUrl(length: 255)])
-  @@index([userId, createdAt])
-  @@index([collectionId])
-  @@map("favorites")
-}
-
-model FavoriteCollection {
-  id        BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
-  userId    BigInt   @map("user_id") @db.UnsignedBigInt
-  name      String   @db.VarChar(64)
-  createdAt DateTime @default(now()) @map("created_at")
-
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  favorites Favorite[]
-
-  @@unique([userId, name])
+  @@unique([userId, licenseId])
   @@index([userId])
-  @@map("favorite_collections")
+  @@map("license_claims")
 }
 
-// ====== 失效链接检测 ======
+// ====== 规则市场系统 ======
 
-model LinkStatusRecord {
-  id            BigInt         @id @default(autoincrement()) @db.UnsignedBigInt
-  urlHash       String         @unique @map("url_hash") @db.VarChar(32)
-  url           String         @db.VarChar(2048)
-  status        LinkStatusEnum @default(unknown)
-  lastCheckedAt DateTime?      @map("last_checked_at")
-  failCount     Int            @default(0) @map("fail_count")
-  createdAt     DateTime       @default(now()) @map("created_at")
-  updatedAt     DateTime       @updatedAt @map("updated_at")
+model Rule {
+  id           BigInt        @id @default(autoincrement()) @db.UnsignedBigInt
+  npmPackage   String        @unique @map("npm_package") @db.VarChar(128)
+  riskLevel    RuleRiskLevel @map("risk_level")
+  description  String        @db.VarChar(500)
+  authorId     BigInt        @map("author_id") @db.UnsignedBigInt
+  author       User          @relation("RuleAuthoredBy", fields: [authorId], references: [id])
+  status       RuleStatus    @default(pending_review)
+  version      String        @db.VarChar(32) @default("1.0.0")
+  takedownCount Int          @default(0) @map("takedown_count")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
 
+  @@index([riskLevel])
   @@index([status])
-  @@index([lastCheckedAt])
-  @@map("link_status")
+  @@index([authorId])
+  @@map("rules")
 }
 
-// ====== 合规相关 ======
-
-model TakedownRecord {
-  id            BigInt         @id @default(autoincrement()) @db.UnsignedBigInt
-  reporterEmail String         @map("reporter_email") @db.VarChar(128)
-  resourceUrl   String         @map("resource_url") @db.VarChar(2048)
-  reason        String         @db.Text
-  status        TakedownStatus @default(pending)
-  resolvedAt    DateTime?      @map("resolved_at")
-  resolvedById  BigInt?        @map("resolved_by_id") @db.UnsignedBigInt
-  createdAt     DateTime       @default(now()) @map("created_at")
-
-  resolvedBy    User?          @relation(fields: [resolvedById], references: [id])
-
-  @@index([status])
-  @@index([createdAt])
-  @@map("takedown_records")
-}
-
-model BlockedKeyword {
-  id          BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
-  keyword     String   @unique @db.VarChar(128)
-  category    String?  @db.VarChar(32)
-  reason      String?  @db.VarChar(128)
-  createdById BigInt?  @map("created_by_id") @db.UnsignedBigInt
-  createdAt   DateTime @default(now()) @map("created_at")
-
-  createdBy   User?    @relation(fields: [createdById], references: [id])
-
-  @@index([category])
-  @@map("blocked_keywords")
-}
-
-model Agreement {
-  id            BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
-  version       String   @unique @db.VarChar(16)
-  content       String   @db.LongText
-  effectiveDate DateTime @map("effective_date")
-  createdAt     DateTime @default(now()) @map("created_at")
-
-  userAgreements UserAgreement[]
-
-  @@map("agreements")
-}
-
-model UserAgreement {
-  id               BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
-  userId           BigInt   @map("user_id") @db.UnsignedBigInt
-  agreementVersion String   @map("agreement_version") @db.VarChar(16)
-  agreedAt         DateTime @default(now()) @map("agreed_at")
-
-  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  agreement        Agreement @relation(fields: [agreementVersion], references: [version])
-
-  @@index([userId])
-  @@map("user_agreements")
-}
-
-// ====== 管理员审计 ======
+// ====== 审计日志（admin 操作 + takedown 记录合并）======
 
 model AdminAuditLog {
-  id         BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
-  adminId    BigInt   @map("admin_id") @db.UnsignedBigInt
-  action     String   @db.VarChar(64)
-  targetType String   @map("target_type") @db.VarChar(32)
-  targetId   BigInt?  @map("target_id") @db.UnsignedBigInt
-  detail     Json?
-  ip         String?  @db.VarChar(45)
-  createdAt  DateTime @default(now()) @map("created_at")
+  id           BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  adminId      BigInt   @map("admin_id") @db.UnsignedBigInt
+  admin        User     @relation("AdminAuditActor", fields: [adminId], references: [id])
+  action       String   @db.VarChar(64)
+  targetType   String   @map("target_type") @db.VarChar(32)
+  targetId     BigInt?  @map("target_id") @db.UnsignedBigInt
+  detail       Json?
+  createdAt    DateTime @default(now()) @map("created_at")
 
-  admin      User     @relation("AdminAuditLogAdmin", fields: [adminId], references: [id])
-
-  @@index([adminId, createdAt])
+  @@index([adminId])
+  @@index([action])
   @@index([targetType, targetId])
   @@map("admin_audit_logs")
 }
 
-// ====== API Key（v0.2 API 开放）======
+// ====== 系统配置（key-value）======
 
-model ApiKey {
-  id          BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
-  userId      BigInt    @map("user_id") @db.UnsignedBigInt
-  keyHash     String    @unique @map("key_hash") @db.VarChar(128)
-  name        String    @db.VarChar(64) // 用户自定义名称
-  prefix      String    @db.VarChar(16) // sk_前8位，用于展示识别
-  scopes      Json?     // 权限范围数组：["search","search-history","favorites"]
-  lastUsedAt  DateTime? @map("last_used_at")
-  revokedAt   DateTime? @map("revoked_at")
-  createdAt   DateTime  @default(now()) @map("created_at")
-
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, createdAt])
-  @@index([keyHash])
-  @@map("api_keys")
-}
-
-// ====== 网盘账号（转存助手）======
-
-model CloudAccount {
-  id        BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
-  userId    BigInt   @map("user_id") @db.UnsignedBigInt
-  type      String   @db.VarChar(32) // quark / aliyun / baidu / xunlei
-  cookie    String   @db.Text // 加密存储的 Cookie
-  remark    String?  @db.VarChar(64)
-  status    String   @default("active") @db.VarChar(16) // active / expired / disabled
-  lastUsedAt DateTime? @map("last_used_at")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, type])
-  @@index([userId])
-  @@map("cloud_accounts")
-}
-
-// ====== 关键词订阅（通知）======
-
-model Subscription {
-  id             BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
-  userId         BigInt   @map("user_id") @db.UnsignedBigInt
-  keyword        String   @db.VarChar(100)
-  notifyEmail    Boolean  @default(true) @map("notify_email")
-  lastNotifiedAt DateTime? @map("last_notified_at")
-  lastResultCount Int     @default(0) @map("last_result_count")
-  active          Boolean  @default(true)
-  createdAt      DateTime @default(now()) @map("created_at")
-
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, keyword])
-  @@index([active, lastNotifiedAt])
-  @@map("subscriptions")
-}
-
-// ====== 资源合集 ======
-
-model Collection {
-  id          BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
-  userId      BigInt   @map("user_id") @db.UnsignedBigInt
-  title       String   @db.VarChar(128)
-  description String?  @db.Text
-  coverUrl    String?  @map("cover_url") @db.VarChar(512)
-  isPublic    Boolean  @default(false) @map("is_public")
-  itemCount   Int      @default(0) @map("item_count")
-  createdAt   DateTime @default(now()) @map("created_at")
+model Config {
+  key         String   @id @db.VarChar(64)
+  value       String   @db.Text
+  description String?  @db.VarChar(255)
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  items       CollectionItem[]
-
-  @@index([userId, createdAt])
-  @@index([isPublic])
-  @@map("collections")
-}
-
-model CollectionItem {
-  id          BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
-  collectionId BigInt  @map("collection_id") @db.UnsignedBigInt
-  resourceUrl String   @map("resource_url") @db.VarChar(2048)
-  title       String   @db.VarChar(512)
-  source      String?  @db.VarChar(64)
-  fileType    String?  @db.VarChar(32)
-  addedAt     DateTime @default(now()) @map("added_at")
-
-  collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
-
-  // resource_url VarChar(2048) 超 3072 索引上限，用前缀索引 + 应用层 dedup
-  @@index([collectionId, resourceUrl(length: 255)])
-  @@index([collectionId, addedAt])
-  @@map("collection_items")
+  @@map("configs")
 }
