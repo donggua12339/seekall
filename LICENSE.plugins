@@ -1,0 +1,73 @@
+# SeekAll 插件协议说明
+
+SeekAll 采用双协议设计：
+
+## SDK 核心 - AGPL-3.0
+
+文件：[../LICENSE](LICENSE)
+
+强 copyleft。衍生作品必须开源。
+适用于：`@seekall/sdk`、`@seekall/api-*`、`@seekall/docs-site`、服务端 BaaS 代码。
+
+## 插件 - MIT
+
+宽松协议。鼓励社区贡献，可闭源衍生。
+适用于：所有 `@seekall/rule-*` 包、第三方规则包。
+
+### 插件作者模板
+
+在插件 `package.json` 中声明：
+
+```json
+{
+  "name": "@your-scope/rule-xxx",
+  "version": "1.0.0",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "peerDependencies": {
+    "@seekall/sdk": "^0.5.0"
+  }
+}
+```
+
+在插件根目录放 `LICENSE` 文件：
+
+```
+MIT License
+
+Copyright (c) 2026 <Your Name>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+## 服务端 BaaS - BUSL
+
+BUSL（Business Source License）：源码可见，商业使用受限。
+适用于：`apps/api/` 服务端代码。
+
+详见 [BUSL 协议说明](https://spdx.org/licenses/BUSL-1.1.html)。
+
+## 为什么这样设计
+
+- **SDK AGPL**：保护核心算法开源，防止云厂商直接包装商业 SaaS
+- **插件 MIT**：降低社区贡献门槛，规则市场繁荣
+- **BaaS BUSL**：保护服务端代码不被商业竞品直接复用
+
+详见 [合规框架](../apps/docs-site/compliance/index.md)。

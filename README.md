@@ -1,117 +1,103 @@
-# 觅源 SeekAll
+# SeekAll — 网盘 / 磁力聚合搜索的规则引擎
 
-> 觅寻全网资源，一站即达
->
-> SeekAll is a full-web resource aggregation search engine supporting multi-source concurrent search (netdisk / magnet / TG channels), with invite-code registration and complete compliance framework.
+> 中立的搜索规则 SDK + 市场。规则在你机器上跑，服务端零接触资源。
 
-觅源 SeekAll 是一款全网资源聚合搜索引擎，支持网盘、磁力、TG 频道等多源搜索，提供一站式资源发现体验。采用 Z++ 小圈子方案，邀请码注册，完整合规框架。
+[![License: AGPL-3.0](https://img.shields.io/badge/SDK-AGPL--3.0-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/Plugins-MIT-green.svg)](LICENSE.plugins)
+[![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](#)
 
-## 特性
+## 它是什么
 
-- **多源聚合**：一次搜索，并发检索多个数据源（PanSou + TG 频道 + 磁力站 + 夸克网盘）
-- **模糊搜索**：Meilisearch 本地索引，支持拼音 / 分词 / 容错，B站风格搜索体验
-- **组合搜索**：实时聚合 + 索引匹配合并去重，召回率最高
-- **热门搜索预热**：每小时统计 top 20 关键词预缓存，热门搜索 0ms 响应
-- **插件化 Provider 架构**：数据源热插拔，多 URL 故障转移 + 重试
-- **邀请码注册**：邀请码控制注册范围，可对接 WM 发卡网销售
-- **会员激活码**：非功能性付费特权（徽章、搜索历史容量扩大、API 额度），合规合法
-- **完整合规框架**：免责声明、用户协议、侵权举报 takedown 流程、关键词黑名单
-- **失效链接检测**：BullMQ 定时任务，自动检测并过滤失效链接
-- **监控告警**：Sentry 错误上报 + 健康检查告警（连续 3 次失败自动上报）
-- **现代化技术栈**：NestJS + Nuxt 3 SSR + Prisma + MySQL + Redis + Meilisearch
+- 一个 npm 包：`npm i @seekall/sdk`
+- 一个规则市场：[rules.seekall.winmelon.cn](https://rules.seekall.winmelon.cn)
+- 一个 BaaS：账号、规则订阅、付费授权
 
-## 技术栈
+## 它不是
 
-| 层       | 选型                                            |
-| -------- | ----------------------------------------------- |
-| 前端     | Nuxt 3 + TypeScript + Naive UI + UnoCSS + Pinia |
-| 后端     | NestJS + Fastify + TypeScript + Prisma          |
-| 数据库   | MySQL 8 + Redis 7                               |
-| 全文检索 | Meilisearch                                     |
-| 任务队列 | BullMQ                                          |
-| 邮件     | Resend + QQ 邮箱 SMTP                           |
-| 反向代理 | Caddy                                           |
-| 进程管理 | PM2                                             |
-| 监控     | Sentry + UptimeRobot                            |
-| 开源协议 | AGPL-3.0                                        |
+- ❌ 不是网盘搜索网站
+- ❌ 不是盗版资源下载工具
+- ❌ 不内置任何指向具体网盘 / 磁力站 / 盗版论坛的默认规则
 
-## 快速开始
-
-### 本地开发
+## 工作方式
 
 ```bash
-# 安装依赖
+npm i @seekall/sdk @seekall/rule-arxiv
+```
+
+```ts
+import { createEngine } from "@seekall/sdk";
+import arxiv from "@seekall/rule-arxiv";
+
+const engine = createEngine({ rules: [arxiv] });
+const hits = await engine.search("transformer");
+```
+
+SDK 在你机器上跑所有规则 → 汇总去重 → 返回结果给你。
+服务端只负责账号、规则市场列表、DMCA 邮箱。
+
+## 风险评级（5 级）
+
+| 级别 | 含义                                  | 可见性               |
+| ---- | ------------------------------------- | -------------------- |
+| L0   | 学术纯净（arxiv / crossref / pubmed） | 所有人               |
+| L1   | 官方 API                              | 所有人               |
+| L2   | 混搜警告（聚合型资源站）              | 会员可见             |
+| L3   | 高风险（论坛 / 网盘类）               | admin 可见，仅作审计 |
+| L4   | 严重侵权源                            | admin 可见，仅作审计 |
+
+5 维权限矩阵（View / Run / Save / Upload / Author）严格映射会员档，详见 [文档](apps/docs-site/guide/permission-matrix.md)。
+
+## 会员（不强制）
+
+| 档位 | 价格 | 时长  | 权限                          |
+| ---- | ---- | ----- | ----------------------------- |
+| 免费 | ¥0   | 永久  | L0-L1 规则                    |
+| 试用 | ¥1   | 7 天  | L0-L2 规则（每账号限购 1 次） |
+| 月卡 | ¥18  | 30 天 | L0-L2 + 上传规则（5 条/月）   |
+| 永久 | ¥68  | 永久  | L0-L3 + 上传规则 + 作者徽章   |
+
+主推永久。¥1 试用每月可发 3 个邀请码（防羊毛）。
+
+## 协议
+
+- SDK 核心：AGPL-3.0（强 copyleft）
+- 插件：MIT（宽松，鼓励社区贡献）
+- 服务端 BaaS：BUSL（商业源码许可）
+
+## 合规
+
+- 站点零接触盗版源（规则在你机器跑）
+- L3/L4 规则仅 admin 可见，仅作审计
+- DMCA 邮箱：`1660069758@qq.com`（24h 内人工响应）
+- Takedown 透明度报告每月发布
+
+## 文档
+
+完整文档在 [apps/docs-site/](apps/docs-site/)（vitepress 静态站）：
+
+- [快速开始](apps/docs-site/guide/getting-started.md)
+- [它是什么](apps/docs-site/guide/what-is-seekall.md)
+- [5 级风险评级](apps/docs-site/guide/risk-levels.md)
+- [5 维权限矩阵](apps/docs-site/guide/permission-matrix.md)
+- [SDK 接口](apps/docs-site/sdk/rule-interface.md)
+- [合规框架](apps/docs-site/compliance/index.md)
+
+## 开发
+
+```bash
 pnpm install
-
-# 配置环境变量
-cp .env.example .env
-# 编辑 .env 填写本地数据库配置
-
-# 生成 Prisma Client
-pnpm --filter api prisma:generate
-
-# 初始化数据库
-pnpm --filter api prisma db push
-pnpm --filter api prisma:seed
-
-# 创建管理员
-pnpm --filter api cli:setup-admin admin admin@example.com YourPassword
-
-# 启动开发服务
-pnpm dev
+pnpm dev          # 启动 API + docs-site
+pnpm build       # 构建
+pnpm test        # 测试
+pnpm lint         # 代码检查
 ```
 
-访问 http://localhost:7300
+## 项目状态
 
-### 生产部署
+v0.5 重构中（Sprint 4 周，详见交接手册）。
+v0.4.1 已归档为 `v0.4.1-archive` git tag。
 
-参考 [部署文档](./docs/DEPLOY.md)。
+## License
 
-## Demo
-
-部署后访问：https://seekall.winmelon.cn（需邀请码注册）
-
-## 截图
-
-> 部署后补充
-
-- 首页（渐变背景 + 搜索框 + 热门搜索）
-- 搜索结果（多源聚合 + 提取码复制 + 来源标签）
-- 后台管理（用户管理 + 邀请码 + 审计日志）
-- 暗黑模式
-
-## 项目结构
-
-```
-seekall/
-├── apps/
-│   ├── api/          # NestJS 后端
-│   └── web/          # Nuxt 3 前端
-├── docker/           # Caddyfile 等部署配置
-├── docs/             # 文档（部署文档等）
-├── .github/          # Issue/PR 模板
-├── ecosystem.config.cjs  # PM2 配置
-├── deploy.sh         # 一键部署脚本
-├── backup.sh         # 数据备份脚本
-└── CLAUDE.md         # 项目宪章（强制约束）
-```
-
-## 合规说明
-
-本项目采用 **Z++ 方案**：
-
-- **只存链接 + 元数据**，绝不存储文件内容
-- **所有用户资源访问范围一致**，无会员分级过滤
-- **付费用户特权仅限非功能性**：徽章、搜索历史容量扩大、API 额度
-- **完整 takedown 流程**：24h 内响应侵权举报
-- **统一关键词过滤**，所有用户一致
-
-详见 [CLAUDE.md](./CLAUDE.md) 的"法律合规边界"章节。
-
-## 贡献
-
-欢迎提交 PR 和 Issue！请先阅读 [贡献指南](./CONTRIBUTING.md)。
-
-## 开源协议
-
-[AGPL-3.0](./LICENSE) - 任何基于本代码的网络服务必须同样开源。
+- SDK 核心：[AGPL-3.0](LICENSE)
+- 插件：MIT（见各插件包内 LICENSE）

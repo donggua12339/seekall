@@ -7,9 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-18（重构进行中）
+
+### 砍掉重做（BREAKING CHANGE）
+
+- **砍 Nuxt Web**：v0.4 的 SSR 前端全部删除
+- **改 vitepress 文档站**：apps/docs-site/ 静态文档（17 篇 md）
+- **砍 API 模块到 5 个**：删 19 个 v0.4 业务模块（search/provider/meilisearch/favorite/collection/subscription/recommendation/subtitle/download/takedown/blocked-keyword/link-checker/cloud-account/api-key/invite-code/membership-code/agreement/tg-alert/search-history）
+- **重写 schema 到 5 张表**：User / License / Rule / AdminAuditLog / Config + LicenseClaim（防羊毛）
+
+### Added
+
+- 规则市场模块（rule）：5 级风险评级（L0-L4）+ 5 维权限矩阵（View/Run/Save/Upload/Author）+ 评审工作流
+- 会员授权模块（license）：¥1 试用 / ¥18 月卡 / ¥68 永久，3 档会员严格映射权限矩阵
+- ¥1 试用防羊毛：每账号限领 1 次（LicenseClaim 表）
+- 老用户邀请码：每月 3 个 ¥1 试用码
+- WM webhook 半自动同步（W2）：WM 付款 -> 自动生成 code 入库
+- 双协议设计：SDK 核心 AGPL-3.0 + 插件 MIT + 服务端 BUSL
+- DMCA 邮箱合规流程：1660069758@qq.com，24h 人工响应
+- 工具中性定位：默认 0 规则，文档零提及具体网盘/磁力站
+
+### Changed
+
+- README 重写为 v0.5 1 页纸定位
+- CLAUDE.md 待更新（v0.4 内容残留）
+- 邀请码注册改为可选（半公开合规路线）
+- User 表删除 githubId / githubUsername（v0.5 不做 GitHub OAuth）
+
+### Removed
+
+- 18 个 v0.4 model：UserPreference / InviteCode / MembershipCode / SearchLog / SearchHistory / Favorite / FavoriteCollection / LinkStatusRecord / TakedownRecord / BlockedKeyword / Agreement / UserAgreement / ApiKey / CloudAccount / Subscription / Collection / CollectionItem / Provider 等
+- GitHub OAuth 登录（github.strategy.ts）
+- scheduled-tasks.service.ts（依赖已删模块）
+
 ## [0.4.1] - 2026-07-16
 
 ### Added
+
 - AI 资源标签（基于标题规则匹配自动分类）
 - AI 资源推荐（基于搜索历史 + Meilisearch 相似度）
 - 关键词订阅 + 邮件通知（每 2 小时检查）
@@ -27,6 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 ## [0.4.0] - 2026-07-14
 
 ### Added
+
 - TG 频道直连（独立 tg-collector 服务）
 - 资源论坛 Provider（通用框架）
 - DHT 自爬（独立 dht-crawler 服务）
@@ -36,6 +71,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 ## [0.3.3] - 2026-07-14
 
 ### Added
+
 - API Key 权限细分（scopes）
 - Telegram Bot
 - 浏览器插件
@@ -43,6 +79,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 ## [0.3.2] - 2026-07-14
 
 ### Added
+
 - 资源详情页 + 分享卡片
 - 登录设备管理
 - Provider 健康度评分
@@ -51,11 +88,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 ## [0.3.1] - 2026-07-13
 
 ### Added
+
 - 搜索建议/过滤/排序/快捷键/收藏夹分组
 
 ## [0.3.0] - 2026-07-13
 
 ### Added
+
 - 部署脚本 + 生产配置 + 部署文档
 - 开源文档（README/CONTRIBUTING/Issue模板）
 - Sentry 监控配置
@@ -63,16 +102,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 ## [0.2.0] - 2026-07-13
 
 ### Added
+
 - 性能优化（缓存分级 TTL + Provider 流式返回）
 - GitHub OAuth 登录
 - API 开放（API Key 鉴权 + 限流）
 
 ### Changed
+
 - husky/eslint 修复 + Prisma 迁移 + 测试覆盖率达标
 
 ## [0.1.0] - 2026-07-13
 
 ### Added
+
 - MVP 骨架
   - 后端 NestJS + Fastify + Prisma
   - 前端 Nuxt 3 SSR + Naive UI + Pinia
@@ -92,6 +134,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 ## [Unreleased - 2026-07-17 部署修复]
 
 ### Fixed
+
 - index.vue 多行 `@click` 模板语法错误 → Nuxt 全路由渲染失败（commit 47a9022）
 - Prisma schema VarChar(2048) 复合 unique 索引超 3072 字节 → 改为前缀索引 (length: 255)
 - Docker alpine 镜像缺少 OpenSSL → Prisma engine 启动失败
@@ -102,12 +145,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 - 容器重启 IP 漂移 → seekall-api seekall-web 固定 172.18.0.5 172.18.0.6
 
 ### Changed
+
 - docker-compose.yml 移除 Caddy 中转层（nginx on host 直连容器）
 - nginx 加 Cross-Origin-* 安全头（COOP/CORP/COEP）+ 隐藏 x-powered-by
 - nginx 加 1 年 immutable 静态资源缓存
 - HTTPS 改由上游 nginx 终止（HSTS / 通配符证书）
 
 ### Added
+
 - HK 服务器 cron 每天 3 点自动备份 MySQL + Redis + Meilisearch
   （scripts/backup-cron.sh，保留 30 天）
 - admin 账号远程初始化工具（scripts/setup-admin.py）
@@ -116,5 +161,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 - 部署运维脚本集合（deploy + rsync + cert + backup）
 
 ### Security
+
 - 自签证书（*.winmelon.cn 通配符）已替换 nginx 配置
 - 静态资源 1 年 immutable 缓存 + 隐藏技术栈指纹（x-powered-by）
