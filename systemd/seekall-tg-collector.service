@@ -1,0 +1,18 @@
+[Unit]
+Description=SeekAll TG Channel Collector
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/seekall/apps/tg-collector
+EnvironmentFile=/opt/seekall/apps/tg-collector/.env
+ExecStart=/usr/bin/node dist/index.js
+Restart=always
+RestartSec=10
+StandardOutput=append:/var/log/seekall/tg-collector.log
+StandardError=append:/var/log/seekall/tg-collector.log
+
+[Install]
+WantedBy=multi-user.target
