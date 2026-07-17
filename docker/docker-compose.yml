@@ -34,32 +34,6 @@ services:
       meilisearch:
         condition: service_started
 
-  seekall-web:
-    build:
-      context: ../apps/web
-      dockerfile: Dockerfile
-    container_name: seekall-web
-    restart: unless-stopped
-    networks:
-      seekall-net:
-        ipv4_address: 172.18.0.6  # 固定 IP（nginx 反代依赖）
-    env_file:
-      - ../.env
-    environment:
-      - NODE_ENV=production
-      - NUXT_HOST=0.0.0.0
-      - NUXT_PORT=3000
-      - NUXT_PUBLIC_API_BASE=http://seekall-api:3000
-    healthcheck:
-      # Nuxt 是 SSR，根路径 / 会渲染首页（200 OK）；用 curl 而不是 wget（alpine node 镜像没 wget）
-      test: ['CMD', 'node', '-e', "require('http').get('http://localhost:3000/', r => process.exit(r.statusCode === 200 ? 0 : 1))"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-    depends_on:
-      - seekall-api
-
   mysql:
     image: mysql:8.0
     container_name: seekall-mysql
