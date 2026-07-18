@@ -6,8 +6,8 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# 安装 pnpm
-RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
+# 安装 pnpm（直接 npm install -g，绕过 corepack 网络下载超时）
+RUN npm install -g pnpm@9.0.0 --registry=https://registry.npmmirror.com
 
 # 使用 npmmirror（淘宝镜像）提升 tarball 下载速度，HK 服务器到 npmjs.org 偶发超时
 RUN pnpm config set registry https://registry.npmmirror.com && \
@@ -45,8 +45,8 @@ WORKDIR /app
 # Alpine 用 musl libc，Prisma 引擎 binary 需要 glibc → 必须装 openssl
 RUN apk add --no-cache openssl
 
-# 安装 pnpm
-RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
+# 安装 pnpm（直接 npm install -g，绕过 corepack 网络下载超时）
+RUN npm install -g pnpm@9.0.0 --registry=https://registry.npmmirror.com
 
 # 安全：非 root 用户
 RUN addgroup -g 1001 -S nodejs && \
