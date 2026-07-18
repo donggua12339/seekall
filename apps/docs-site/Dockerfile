@@ -18,7 +18,7 @@ COPY package.json ./
 RUN pnpm install --no-frozen-lockfile --ignore-scripts
 
 # copy 源码
-COPY ./
+COPY . .
 
 # 构建
 RUN pnpm build

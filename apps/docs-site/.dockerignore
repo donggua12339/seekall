@@ -1,0 +1,11 @@
+node_modules
+.vitepress/dist
+.vitepress/cache
+.git
+.github
+.husky
+*.log
+npm-debug.log*
+.DS_Store
+.idea
+.vscode
