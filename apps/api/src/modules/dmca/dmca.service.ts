@@ -6,6 +6,7 @@ import {
   ForbiddenException,
   Inject,
 } from '@nestjs/common'
+import { Cron } from '@nestjs/schedule'
 import { PrismaService } from '../../database/prisma.service'
 import { REDIS_CLIENT } from '../../database/redis.module'
 import { MailService } from '../mail/mail.service'
@@ -187,16 +188,16 @@ export class DmcaService {
   }
 
   /**
-   * 透明度报告：上月 takedown 统计
+   * 透明度报告：指定月份 takedown 统计（默认上月）
    * - 收到举报数
    * - 处理数（actioned）
    * - 拒绝数（rejected，误报）
    * - 平均响应时间（小时）
+   *
+   * @param yearMonth 格式 "YYYY-MM"，不传则默认上月
    */
-  async transparencyReport() {
-    const now = new Date()
-    const monthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-    const monthEnd = new Date(now.getFullYear(), now.getMonth(), 1)
+  async transparencyReport(yearMonth?: string) {
+    const { monthStart, monthEnd, monthLabel } = this.parseMonthRange(yearMonth)
 
     const [total, actioned, rejected, pending, handledNotices] = await Promise.all([
       this.prisma.dmcaNotice.count({
@@ -238,13 +239,120 @@ export class DmcaService {
             return sum + hours
           }, 0) / handledNotices.length
 
-    return {
-      month: `${monthStart.getFullYear()}-${String(monthStart.getMonth() + 1).padStart(2, '0')}`,
+    const report = {
+      month: monthLabel,
       totalNotices: total,
       actioned,
       rejected,
       pending,
       avgResponseHours: Math.round(avgResponseHours * 10) / 10,
+    }
+
+    // 每月 1 号 cron 调用时持久化到 configs 表，供历史查询
+    return report
+  }
+
+  /**
+   * 每月 1 号 00:30 cron 任务：
+   * - 跑上月透明度报告
+   * - 持久化到 configs 表（key=transparency_report_YYYY-MM）
+   * - 已存在则覆盖
+   */
+  @Cron('30 0 1 * *')
+  async cronMonthlyTransparencyReport() {
+    const now = new Date()
+    // 上月
+    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    const yearMonth = `${lastMonth.getFullYear()}-${String(lastMonth.getMonth() + 1).padStart(2, '0')}`
+
+    const report = await this.transparencyReport(yearMonth)
+
+    await this.prisma.config.upsert({
+      where: { key: `transparency_report_${yearMonth}` },
+      create: {
+        key: `transparency_report_${yearMonth}`,
+        value: JSON.stringify(report),
+        description: `DMCA transparency report for ${yearMonth}`,
+      },
+      update: { value: JSON.stringify(report) },
+    })
+
+    this.logger.log(
+      `Monthly transparency report saved: ${yearMonth} -> ${report.totalNotices} notices`,
+    )
+    return report
+  }
+
+  /**
+   * 查询历史月度透明度报告（从 configs 表读）
+   */
+  async getHistoricalReport(yearMonth: string) {
+    const key = `transparency_report_${yearMonth}`
+    const config = await this.prisma.config.findUnique({ where: { key } })
+    if (!config) {
+      throw new NotFoundException(`${yearMonth} 报告未生成`)
+    }
+    return JSON.parse(config.value) as {
+      month: string
+      totalNotices: number
+      actioned: number
+      rejected: number
+      pending: number
+      avgResponseHours: number
+    }
+  }
+
+  /**
+   * 列出所有已生成的历史报告（key 列表）
+   */
+  async listHistoricalReports() {
+    const configs = await this.prisma.config.findMany({
+      where: { key: { startsWith: 'transparency_report_' } },
+      orderBy: { key: 'desc' },
+      select: { key: true, updatedAt: true },
+    })
+    return configs.map((c) => ({
+      yearMonth: c.key.replace('transparency_report_', ''),
+      updatedAt: c.updatedAt,
+    }))
+  }
+
+  /**
+   * 解析 yearMonth 字符串为月份起止时间
+   * - 不传或空 -> 上月
+   * - 格式 "YYYY-MM" -> 该月
+   */
+  private parseMonthRange(yearMonth?: string): {
+    monthStart: Date
+    monthEnd: Date
+    monthLabel: string
+  } {
+    if (!yearMonth) {
+      const now = new Date()
+      const start = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+      const end = new Date(now.getFullYear(), now.getMonth(), 1)
+      return {
+        monthStart: start,
+        monthEnd: end,
+        monthLabel: `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`,
+      }
+    }
+
+    const match = /^(\d{4})-(\d{2})$/.exec(yearMonth)
+    if (!match) {
+      throw new BadRequestException('yearMonth 格式应为 "YYYY-MM"')
+    }
+    const year = parseInt(match[1], 10)
+    const month = parseInt(match[2], 10) - 1 // JS month 0-11
+    if (month < 0 || month > 11) {
+      throw new BadRequestException('month 应为 01-12')
+    }
+    const start = new Date(year, month, 1)
+    const end = new Date(year, month + 1, 1)
+    return {
+      monthStart: start,
+      monthEnd: end,
+      monthLabel: `${year}-${String(month + 1).padStart(2, '0')}`,
     }
   }
 

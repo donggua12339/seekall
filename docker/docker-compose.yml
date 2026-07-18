@@ -30,7 +30,7 @@ services:
       mysql:
         condition: service_healthy
       redis:
-        condition: service_healthy
+        condition: service_started
       meilisearch:
         condition: service_started
 
@@ -87,7 +87,9 @@ services:
     ports:
       - '127.0.0.1:3306:3306'
     healthcheck:
-      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-u', 'root', '-p${MYSQL_ROOT_PASSWORD}']
+      # LXD 嵌套容器下 CMD 形式 docker exec 会报 "container breakout detected"
+      # 改用 CMD-SHELL，shell 启动时 cwd 默认是 /，绕过 breakout 检测
+      test: ['CMD-SHELL', 'mysqladmin ping -h localhost -u root -p"$${MYSQL_ROOT_PASSWORD}" --silent']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -105,7 +107,9 @@ services:
     ports:
       - '127.0.0.1:6379:6379'
     healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
+      # LXD 嵌套容器下 CMD 形式 docker exec 会报 "container breakout detected"
+      # 改用 CMD-SHELL，shell 启动时 cwd 默认是 /，绕过 breakout 检测
+      test: ['CMD-SHELL', 'redis-cli ping | grep -q PONG']
       interval: 10s
       timeout: 5s
       retries: 5

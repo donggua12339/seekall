@@ -104,9 +104,23 @@ export class DmcaController {
 
   @Public()
   @Get('transparency')
-  @ApiOperation({ summary: '透明度报告：上月 takedown 统计' })
-  transparency() {
-    return this.service.transparencyReport()
+  @ApiOperation({ summary: '透明度报告：默认上月，可传 ?yearMonth=YYYY-MM 查任意月' })
+  transparency(@Query('yearMonth') yearMonth?: string) {
+    return this.service.transparencyReport(yearMonth)
+  }
+
+  @Public()
+  @Get('transparency/history')
+  @ApiOperation({ summary: '历史月度透明度报告列表' })
+  history() {
+    return this.service.listHistoricalReports()
+  }
+
+  @Public()
+  @Get('transparency/:yearMonth')
+  @ApiOperation({ summary: '查指定月份透明度报告（从 configs 表读持久化结果）' })
+  historicalReport(@Param('yearMonth') yearMonth: string) {
+    return this.service.getHistoricalReport(yearMonth)
   }
 }
 
