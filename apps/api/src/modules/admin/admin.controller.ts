@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Patch, Query, Param, ParseIntPipe } from '@nestjs/common'
+import { Body, Controller, Get, Patch, Post, Query, Param, ParseIntPipe } from '@nestjs/common'
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger'
 import { AdminService } from './admin.service'
 import { Roles } from '../../common/decorators/roles.decorator'
@@ -19,6 +19,10 @@ class AnalyticsDto {
   @IsInt() @Min(1) @Max(90) days: number = 7
 }
 
+class ReportDeadDto {
+  @IsOptional() @IsString() note?: string
+}
+
 @ApiTags('后台管理（super_admin）')
 @ApiBearerAuth()
 @Roles('super_admin')
@@ -33,7 +37,7 @@ export class AdminController {
   }
 
   @Get('analytics')
-  @ApiOperation({ summary: '用户行为分析' })
+  @ApiOperation({ summary: '用户行为分析（基于 license/rule 数据）' })
   analytics(@Query() dto: AnalyticsDto) {
     return this.service.analytics(dto.days)
   }
@@ -64,5 +68,32 @@ export class AdminController {
   @ApiOperation({ summary: '管理员审计日志' })
   auditLogs(@Query() dto: ListUsersDto) {
     return this.service.auditLogs(dto.page, dto.pageSize)
+  }
+
+  @Get('transparency')
+  @ApiOperation({ summary: '透明度报告（上月 takedown 统计）' })
+  transparency() {
+    return this.service.transparencyReport()
+  }
+}
+
+@ApiTags('S4 失效举报')
+@ApiBearerAuth()
+@Controller('admin/rules')
+export class ReportDeadRuleController {
+  constructor(private readonly service: AdminService) {}
+
+  @Post(':id/report-dead')
+  @ApiOperation({ summary: '用户举报规则失效（累计 3 次自动隐藏）' })
+  reportDead(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: ReportDeadDto,
+    @CurrentUser('sub') userId: string,
+  ) {
+    return this.service.reportDeadRule({
+      ruleId: BigInt(id),
+      userId: BigInt(userId),
+      note: dto.note,
+    })
   }
 }

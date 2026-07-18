@@ -37,6 +37,55 @@ export class LicenseService {
   }
 
   /**
+   * License 列表（admin 用）
+   */
+  async list(options: {
+    page: number
+    pageSize: number
+    status?: 'unused' | 'used' | 'disabled'
+    tier?: 'trial' | 'monthly' | 'lifetime'
+  }) {
+    const where: Record<string, unknown> = {}
+    if (options.status) where.status = options.status
+    if (options.tier) where.tier = options.tier
+
+    const [list, total] = await Promise.all([
+      this.prisma.license.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (options.page - 1) * options.pageSize,
+        take: options.pageSize,
+      }),
+      this.prisma.license.count({ where }),
+    ])
+    return {
+      list,
+      total,
+      page: options.page,
+      pageSize: options.pageSize,
+      totalPages: Math.ceil(total / options.pageSize),
+    }
+  }
+
+  async get(id: bigint) {
+    const license = await this.prisma.license.findUnique({ where: { id } })
+    if (!license) throw new NotFoundException('License 不存在')
+    return license
+  }
+
+  async disable(id: bigint) {
+    const license = await this.prisma.license.findUnique({ where: { id } })
+    if (!license) throw new NotFoundException('License 不存在')
+    if (license.status === 'used') {
+      throw new BadRequestException('已使用的 license 不能禁用')
+    }
+    return this.prisma.license.update({
+      where: { id },
+      data: { status: 'disabled' },
+    })
+  }
+
+  /**
    * 老用户生成 ¥1 邀请码（每月限 3 个）
    */
   async generateInviteTrialCode(userId: bigint) {
