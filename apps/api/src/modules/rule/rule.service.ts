@@ -17,6 +17,11 @@ const RISK_LEVEL_MAP: Record<number, RuleRiskLevel> = {
   4: RuleRiskLevel.l4,
 }
 
+// 数字 0..n 对应的所有 enum 值列表（Prisma enum 不支持 lte，需用 in）
+function riskLevelsUpTo(max: number): RuleRiskLevel[] {
+  return Array.from({ length: max + 1 }, (_, i) => RISK_LEVEL_MAP[i])
+}
+
 @Injectable()
 export class RuleService {
   private readonly logger = new Logger(RuleService.name)
@@ -43,14 +48,22 @@ export class RuleService {
 
     // 非 admin 只能看 L0-L2
     const maxRiskNum = actorRole === 'super_admin' ? 4 : 2
-    const maxRisk = RISK_LEVEL_MAP[maxRiskNum]
+
+    // Prisma enum 不支持 lte 比较，用 in 列表
+    let riskLevelFilter: RuleRiskLevel | RuleRiskLevel[]
+    if (options.riskLevel !== undefined) {
+      // 显式按 riskLevel 过滤时，先检查权限
+      if (options.riskLevel > maxRiskNum) {
+        return { list: [], total: 0, page, pageSize, totalPages: 0 }
+      }
+      riskLevelFilter = RISK_LEVEL_MAP[options.riskLevel]
+    } else {
+      riskLevelFilter = riskLevelsUpTo(maxRiskNum)
+    }
 
     const where: Record<string, unknown> = {
       status: RuleStatus.published,
-      riskLevel: { lte: maxRisk },
-    }
-    if (options.riskLevel !== undefined) {
-      where.riskLevel = RISK_LEVEL_MAP[options.riskLevel]
+      riskLevel: Array.isArray(riskLevelFilter) ? { in: riskLevelFilter } : riskLevelFilter,
     }
 
     const [list, total] = await Promise.all([
