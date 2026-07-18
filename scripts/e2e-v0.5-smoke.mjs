@@ -14,12 +14,32 @@
 
 import { createEngine } from '../packages/sdk/dist/index.js'
 import arxiv from '../packages/rule-arxiv/dist/index.js'
-import { execSync } from 'child_process'
-import { readFileSync } from 'fs'
-import { globSync } from 'glob'
+import { readFileSync, readdirSync, statSync } from 'fs'
+import { join } from 'path'
 
 const API_BASE = process.env.API_BASE || 'http://localhost:7301/api/v1'
 const SKIP_SERVER = process.argv.includes('--skip-server')
+
+// 递归扫描目录下所有匹配扩展的文件（替代 glob 依赖）
+function scanFiles(root, exts) {
+  const out = []
+  if (!statSync(root, { throwIfNoEntry: false })) return out
+  const stack = [root]
+  while (stack.length) {
+    const cur = stack.pop()
+    for (const name of readdirSync(cur)) {
+      const full = join(cur, name)
+      const st = statSync(full)
+      if (st.isDirectory()) {
+        if (name === 'node_modules' || name === 'dist' || name === '.git') continue
+        stack.push(full)
+      } else if (exts.some((e) => name.endsWith(e))) {
+        out.push(full)
+      }
+    }
+  }
+  return out
+}
 
 let pass = 0
 let fail = 0
@@ -94,27 +114,57 @@ const FORBIDDEN_PATTERNS = [
   '去水印',
 ]
 
-const scanDirs = ['apps/docs-site/', 'packages/sdk/', 'packages/rule-arxiv/', 'packages/rule-crossref/', 'packages/rule-pubmed/', 'README.md', 'docs/']
+const scanRoots = [
+  ['apps/docs-site/', ['md']],
+  ['packages/sdk/', ['ts', 'js', 'mjs', 'json']],
+  ['packages/rule-arxiv/', ['ts', 'js', 'mjs', 'json']],
+  ['packages/rule-crossref/', ['ts', 'js', 'mjs', 'json']],
+  ['packages/rule-pubmed/', ['ts', 'js', 'mjs', 'json']],
+]
 
-let violations = 0
-for (const pattern of FORBIDDEN_PATTERNS) {
-  try {
-    const regex = new RegExp(pattern, 'i')
-    for (const dir of scanDirs) {
-      const files = globSync(`${dir}**/*.{md,ts,js,mjs,json,vue}`, { nodir: true })
-      for (const file of files) {
-        const content = readFileSync(file, 'utf8')
-        if (regex.test(content)) {
-          console.log(`  \x1b[33mWARN\x1b[0m 命中 "${pattern}" in ${file}`)
-          violations++
-        }
-      }
-    }
-  } catch (err) {
-    // glob 路径不存在，跳过
+// 单独文件（只扫 v0.5 新建的文档，不扫 v0.4.1 遗留的 docs/ 老文档）
+const scanSingleFiles = ['README.md', 'docs/dmca-notice-template.md', 'docs/xiaohongshu-draft.md']
+
+// 上下文白名单：命中行附近出现这些标记说明是"负面清单引用"（正确用法）
+const WHITELIST_CONTEXT = ['❌', '不会', '不教', '不出现', '不内置', '不要', '禁止', '红线', '不提供']
+
+// 收集所有要扫描的文件
+const allFiles = []
+for (const [dir, exts] of scanRoots) {
+  const root = join(process.cwd(), dir)
+  for (const f of scanFiles(root, exts.map((e) => '.' + e))) {
+    allFiles.push(f)
   }
 }
-log(violations === 0, `合规 grep 零命中 (违规 ${violations} 处)`)
+for (const single of scanSingleFiles) {
+  const full = join(process.cwd(), single)
+  if (statSync(full, { throwIfNoEntry: false })) allFiles.push(full)
+}
+
+let violations = 0
+const matchedFiles = new Set()
+for (const pattern of FORBIDDEN_PATTERNS) {
+  const regex = new RegExp(pattern, 'i')
+  for (const file of allFiles) {
+    let content
+    try {
+      content = readFileSync(file, 'utf8')
+    } catch {
+      continue
+    }
+    const lines = content.split(/\r?\n/)
+    for (let i = 0; i < lines.length; i++) {
+      if (!regex.test(lines[i])) continue
+      // 上下文检查：命中行前后 3 行有白名单标记 -> 负面清单引用，跳过
+      const ctx = lines.slice(Math.max(0, i - 3), i + 4).join('\n')
+      if (WHITELIST_CONTEXT.some((w) => ctx.includes(w))) continue
+      console.log(`  \x1b[33mWARN\x1b[0m 命中 "${pattern}" in ${file}:${i + 1}`)
+      violations++
+      matchedFiles.add(file)
+    }
+  }
+}
+log(violations === 0, `合规 grep 零命中 (违规 ${violations} 处, 文件 ${matchedFiles.size} 个)`)
 
 // ============== 总结 ==============
 console.log(`\n=== 总结: ${pass} passed, ${fail} failed ===`)
