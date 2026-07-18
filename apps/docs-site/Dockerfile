@@ -6,11 +6,9 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# pnpm
-RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
-
-# 配置 npmmirror（避开 esbuild binary CDN mismatch）
-RUN pnpm config set registry https://registry.npmmirror.com
+# pnpm + git（vitepress build 需要 git 计算 lastUpdated）
+RUN apk add --no-cache git && \
+  npm install -g pnpm@9.0.0 --registry=https://registry.npmmirror.com
 
 # 先 copy package.json 装依赖（缓存层）
 COPY package.json ./
