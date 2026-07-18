@@ -13,13 +13,12 @@ RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
 RUN pnpm config set registry https://registry.npmmirror.com
 
 # 先 copy package.json 装依赖（缓存层）
-COPY apps/docs-site/package.json ./
-COPY pnpm-workspace.yaml ./
+COPY package.json ./
 
 RUN pnpm install --no-frozen-lockfile --ignore-scripts
 
 # copy 源码
-COPY apps/docs-site/ ./
+COPY ./
 
 # 构建
 RUN pnpm build
@@ -34,7 +33,7 @@ RUN rm /etc/nginx/conf.d/default.conf
 COPY --from=builder /app/.vitepress/dist /usr/share/nginx/html
 
 # nginx 配置：SPA fallback + 静态资源缓存
-COPY apps/docs-site/nginx.conf /etc/nginx/conf.d/docs-site.conf
+COPY nginx.conf /etc/nginx/conf.d/docs-site.conf
 
 EXPOSE 80
 
