@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query, ParseIntPipe } from '@nestjs/common'
+import { Body, Controller, Get, Param, Post, Delete, Query, ParseIntPipe } from '@nestjs/common'
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger'
 import { RuleService } from './rule.service'
 import { Public } from '../../common/decorators/public.decorator'
@@ -9,7 +9,7 @@ import { IsString, IsInt, Min, Max, IsBoolean, IsOptional } from 'class-validato
 class ListRuleDto {
   @IsInt() @Min(1) page: number = 1
   @IsInt() @Min(1) @Max(100) pageSize: number = 20
-  @IsInt() @Min(0) @Max(4) riskLevel?: number
+  @IsOptional() @IsInt() @Min(0) @Max(4) riskLevel?: number
 }
 
 class SubmitRuleDto {
@@ -95,6 +95,13 @@ export class RuleController {
   @ApiOperation({ summary: '订阅规则（同步到 SDK 配置）' })
   subscribe(@Param('id', ParseIntPipe) id: number, @CurrentUser('sub') userId: string) {
     return this.service.subscribe(BigInt(id), BigInt(userId))
+  }
+
+  @ApiBearerAuth()
+  @Delete(':id/subscribe')
+  @ApiOperation({ summary: '取消订阅规则' })
+  unsubscribe(@Param('id', ParseIntPipe) id: number, @CurrentUser('sub') userId: string) {
+    return this.service.unsubscribe(BigInt(id), BigInt(userId))
   }
 
   @ApiBearerAuth()

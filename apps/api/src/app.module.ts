@@ -9,6 +9,7 @@ import { UserModule } from './modules/user/user.module'
 import { AdminModule } from './modules/admin/admin.module'
 import { RuleModule } from './modules/rule/rule.module'
 import { LicenseModule } from './modules/license/license.module'
+import { DmcaModule } from './modules/dmca/dmca.module'
 import { HealthModule } from './modules/health/health.module'
 import { MailModule } from './modules/mail/mail.module'
 import { envValidation } from './config/env.validation'
@@ -44,12 +45,13 @@ import { envValidation } from './config/env.validation'
     RedisModule,
     MailModule,
 
-    // v0.5 业务模块（5 个 + health）
+    // v0.5 业务模块（5 个 + health + dmca）
     AuthModule,
     UserModule,
     AdminModule,
     RuleModule,
     LicenseModule,
+    DmcaModule,
     HealthModule,
   ],
 })

@@ -69,4 +69,7 @@ export const envValidation = Joi.object({
 
   // 日志
   LOG_LEVEL: Joi.string().valid('debug', 'info', 'warn', 'error').default('info'),
+
+  // DMCA（P2-1 可选，不配则跳过 admin 邮件通知）
+  DMCA_ADMIN_EMAIL: Joi.string().email().optional(),
 })

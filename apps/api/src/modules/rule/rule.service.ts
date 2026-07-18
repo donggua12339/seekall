@@ -122,8 +122,8 @@ export class RuleService {
    * E 社群评审工作流（L2 规则）
    * - 评审员需 ¥18 月卡及以上（isPaid === true）
    * - 不能评审自己提交的规则
+   * - 一人一票（再次评审会更新 approve/comment）
    * - ≥3 个赞同 -> admin 终审
-   * TODO: M2 阶段实现完整评审，当前仅记录评审
    */
   async review(input: { ruleId: bigint; reviewerId: bigint; approve: boolean; comment?: string }) {
     const rule = await this.prisma.rule.findUnique({ where: { id: input.ruleId } })
@@ -144,30 +144,27 @@ export class RuleService {
       throw new ForbiddenException('评审需 ¥18 月卡及以上会员')
     }
 
-    // 记录评审（复用 AdminAuditLog 表，action='rule_review'）
-    await this.prisma.adminAuditLog.create({
-      data: {
-        adminId: input.reviewerId,
-        action: 'rule_review',
-        targetType: 'rule',
-        targetId: input.ruleId,
-        detail: { approve: input.approve, comment: input.comment },
+    // upsert 评审（一人一票，再次评审更新 approve/comment）
+    await this.prisma.ruleReview.upsert({
+      where: {
+        ruleId_reviewerId: { ruleId: input.ruleId, reviewerId: input.reviewerId },
+      },
+      create: {
+        ruleId: input.ruleId,
+        reviewerId: input.reviewerId,
+        approve: input.approve,
+        comment: input.comment,
+      },
+      update: {
+        approve: input.approve,
+        comment: input.comment,
       },
     })
 
-    // 统计赞同数（M2 简化：≥3 直接通过，待 admin 终审）
-    // Prisma JsonFilter 不支持 path+equals 直接组合，改为取出后过滤
-    const reviewLogs = await this.prisma.adminAuditLog.findMany({
-      where: {
-        action: 'rule_review',
-        targetId: input.ruleId,
-      },
-      select: { detail: true },
+    // 统计赞同数
+    const approvals = await this.prisma.ruleReview.count({
+      where: { ruleId: input.ruleId, approve: true },
     })
-    const approvals = reviewLogs.filter((log) => {
-      const d = log.detail as { approve?: boolean } | null
-      return d?.approve === true
-    }).length
 
     this.logger.log(
       `Rule ${input.ruleId} reviewed by ${input.reviewerId}: ${input.approve ? 'approve' : 'reject'} (${approvals}/3)`,
@@ -264,6 +261,7 @@ export class RuleService {
    * 用户订阅规则（同步到 SDK 配置）
    * 免费：可订阅 L0-L1
    * 付费：可订阅 L0-L2（L3/L4 永远不可订阅）
+   * 幂等：重复订阅不会产生新记录
    */
   async subscribe(ruleId: bigint, userId: bigint) {
     const rule = await this.prisma.rule.findUnique({ where: { id: ruleId } })
@@ -288,38 +286,47 @@ export class RuleService {
       }
     }
 
-    // 记录订阅（复用 AdminAuditLog，action='rule_subscribe'）
-    // TODO: M2 拆出 RuleSubscription 表
-    await this.prisma.adminAuditLog.create({
-      data: {
-        adminId: userId,
-        action: 'rule_subscribe',
-        targetType: 'rule',
-        targetId: ruleId,
+    // upsert 幂等：已订阅则不动，未订阅则创建
+    await this.prisma.ruleSubscription.upsert({
+      where: {
+        userId_ruleId: { userId, ruleId },
       },
+      create: { userId, ruleId },
+      update: {},
     })
 
     return { ruleId, npmPackage: rule.npmPackage, subscribed: true }
   }
 
   /**
+   * 用户取消订阅规则
+   */
+  async unsubscribe(ruleId: bigint, userId: bigint) {
+    const sub = await this.prisma.ruleSubscription.findUnique({
+      where: { userId_ruleId: { userId, ruleId } },
+    })
+    if (!sub) {
+      throw new NotFoundException('未订阅该规则')
+    }
+    await this.prisma.ruleSubscription.delete({
+      where: { userId_ruleId: { userId, ruleId } },
+    })
+    return { ruleId, subscribed: false }
+  }
+
+  /**
    * 用户已订阅规则列表（SDK 拉取）
    */
   async mySubscriptions(userId: bigint) {
-    const logs = await this.prisma.adminAuditLog.findMany({
-      where: {
-        adminId: userId,
-        action: 'rule_subscribe',
-        targetType: 'rule',
-      },
-      select: { targetId: true },
+    const subs = await this.prisma.ruleSubscription.findMany({
+      where: { userId },
+      select: { ruleId: true },
     })
-    const ruleIds = [...new Set(logs.map((l) => l.targetId).filter((x): x is bigint => x !== null))]
-    if (ruleIds.length === 0) return []
+    if (subs.length === 0) return []
 
     return this.prisma.rule.findMany({
       where: {
-        id: { in: ruleIds },
+        id: { in: subs.map((s) => s.ruleId) },
         status: RuleStatus.published,
       },
       select: {

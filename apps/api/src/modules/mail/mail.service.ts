@@ -110,6 +110,13 @@ export class MailService {
     await this.send(email, subject, html)
   }
 
+  /**
+   * 通用邮件发送（用于 DMCA 通知、admin 告警等业务邮件）
+   */
+  async sendRaw(to: string, subject: string, html: string): Promise<void> {
+    return this.send(to, subject, html)
+  }
+
   private async send(to: string, subject: string, html: string): Promise<void> {
     try {
       if (this.provider === 'resend' && this.resend) {

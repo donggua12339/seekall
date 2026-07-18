@@ -90,6 +90,9 @@ model User {
   licenseClaims      LicenseClaim[]
   rulesAuthored      Rule[]        @relation("RuleAuthoredBy")
   auditLogs          AdminAuditLog[] @relation("AdminAuditActor")
+  dmcaNoticesHandled DmcaNotice[]  @relation("DmcaNoticeHandler")
+  ruleSubscriptions  RuleSubscription[]
+  ruleReviews        RuleReview[]  @relation("RuleReviewReviewer")
 
   @@index([status])
   @@index([isPaid])
@@ -149,6 +152,10 @@ model Rule {
   createdAt    DateTime      @default(now()) @map("created_at")
   updatedAt    DateTime      @updatedAt @map("updated_at")
 
+  dmcaNotices  DmcaNotice[]
+  subscriptions RuleSubscription[]
+  reviews       RuleReview[]
+
   @@index([riskLevel])
   @@index([status])
   @@index([authorId])
@@ -182,4 +189,101 @@ model Config {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   @@map("configs")
+}
+
+// ====== DMCA Takedown Notice（合规证据，永不删除）======
+//
+// 用途：公众通过 POST /api/v1/dmca/notice 提交版权侵权举报
+// 字段对齐 DMCA §512(c) Takedown Notice 7 项必填要素
+// 处理流程：pending -> verified / rejected -> actioned（关联 Rule.takedown）
+// 透明度报告：每月 1 号统计上月数据
+
+model DmcaNotice {
+  id                  BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  // 侵权 URL（规则市场中的规则详情页 URL，或外部资源 URL）
+  infringingUrl       String   @map("infringing_url") @db.VarChar(500)
+  // 关联到具体 Rule（若提交者能定位到）。可空：admin 复核时再关联
+  ruleId              BigInt?  @map("rule_id") @db.UnsignedBigInt
+  rule                Rule?    @relation(fields: [ruleId], references: [id])
+  // 原作品信息
+  originalTitle       String   @map("original_title") @db.VarChar(255)
+  copyrightOwner      String   @map("copyright_owner") @db.VarChar(255)
+  // 举报人联系方式
+  reporterEmail       String   @map("reporter_email") @db.VarChar(128)
+  reporterRole        DmcaReporterRole @map("reporter_role")
+  // 两项法定声明（必须为 true 才接受）
+  goodFaithStatement  Boolean  @default(false) @map("good_faith_statement")
+  accuracyStatement   Boolean  @default(false) @map("accuracy_statement")
+  electronicSignature String   @map("electronic_signature") @db.VarChar(128)
+  // 可选额外说明
+  notes               String?  @db.Text
+  // 处理状态
+  status              DmcaNoticeStatus @default(pending)
+  handlerAdminId      BigInt?  @map("handler_admin_id") @db.UnsignedBigInt
+  handlerAdmin        User?    @relation("DmcaNoticeHandler", fields: [handlerAdminId], references: [id])
+  handlerNote         String?  @map("handler_note") @db.VarChar(500)
+  handledAt           DateTime? @map("handled_at")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  @@index([status])
+  @@index([ruleId])
+  @@index([createdAt])
+  @@index([handlerAdminId])
+  @@map("dmca_notices")
+}
+
+enum DmcaReporterRole {
+  owner
+  agent
+}
+
+enum DmcaNoticeStatus {
+  pending
+  verified
+  actioned
+  rejected
+}
+
+// ====== 规则订阅（M2 从 AdminAuditLog 拆出）======
+//
+// 用户订阅一条规则，SDK 拉取订阅列表用
+// 幂等约束：@@unique([userId, ruleId]) - 重复订阅不会产生新记录
+// 取消订阅直接 delete 行
+
+model RuleSubscription {
+  id        BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  userId    BigInt   @map("user_id") @db.UnsignedBigInt
+  user      User     @relation(fields: [userId], references: [id])
+  ruleId    BigInt   @map("rule_id") @db.UnsignedBigInt
+  rule      Rule     @relation(fields: [ruleId], references: [id])
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([userId, ruleId])
+  @@index([userId])
+  @@index([ruleId])
+  @@map("rule_subscriptions")
+}
+
+// ====== 规则评审（M2 从 AdminAuditLog 拆出）======
+//
+// E 社群评审工作流：L2 规则评审
+// - 评审员需付费会员
+// - 不能评审自己提交的规则
+// - ≥3 赞成 -> admin 终审
+// 幂等约束：@@unique([ruleId, reviewerId]) - 一人一票
+
+model RuleReview {
+  id         BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  ruleId     BigInt   @map("rule_id") @db.UnsignedBigInt
+  rule       Rule     @relation(fields: [ruleId], references: [id])
+  reviewerId BigInt   @map("reviewer_id") @db.UnsignedBigInt
+  reviewer   User     @relation("RuleReviewReviewer", fields: [reviewerId], references: [id])
+  approve    Boolean
+  comment    String?  @db.VarChar(500)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@unique([ruleId, reviewerId])
+  @@index([ruleId])
+  @@index([reviewerId])
+  @@map("rule_reviews")
 }

@@ -1,0 +1,53 @@
+import http from './instance'
+
+export interface AdminUser {
+  id: string
+  username: string
+  email: string
+  role: 'super_admin' | 'user'
+  isPaid: boolean
+  paidUntil?: string | null
+  tier?: 'trial' | 'monthly' | 'lifetime' | null
+  status: 'pending_verification' | 'active' | 'banned' | 'deleted'
+  bannedReason?: string | null
+  createdAt: string
+}
+
+export interface UserListRes {
+  list: AdminUser[]
+  total: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
+
+export interface Dashboard {
+  userCount: number
+  paidUserCount: number
+  licenseCount: number
+}
+
+export interface AuditLog {
+  id: string
+  adminId: string
+  admin?: { id: string; username: string }
+  action: string
+  targetType: string
+  targetId?: string | null
+  detail?: unknown
+  createdAt: string
+}
+
+export const adminApi = {
+  dashboard: () => http.get<unknown, Dashboard>('/admin/dashboard'),
+  listUsers: (params: { page?: number; pageSize?: number; search?: string }) =>
+    http.get<unknown, UserListRes>('/admin/users', { params }),
+  banUser: (id: string, reason: string) =>
+    http.patch<unknown, AdminUser>(`/admin/users/${id}/ban`, { reason }),
+  unbanUser: (id: string) => http.patch<unknown, AdminUser>(`/admin/users/${id}/unban`),
+  auditLogs: (params: { page?: number; pageSize?: number }) =>
+    http.get<unknown, { list: AuditLog[]; total: number; page: number; pageSize: number }>(
+      '/admin/audit-logs',
+      { params },
+    ),
+}

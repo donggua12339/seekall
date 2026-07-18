@@ -10,6 +10,15 @@ build/
 .nitro/
 .cache/
 
+# TypeScript build info
+*.tsbuildinfo
+
+# Vite / vue-tsc auto-generated
+apps/admin/vite.config.d.ts
+apps/admin/vite.config.js
+apps/admin/src/auto-imports.d.ts
+apps/admin/src/components.d.ts
+
 # Environment
 .env
 .env.local
