@@ -48,6 +48,13 @@ export class LicenseController {
     return this.service.generateInviteTrialCode(BigInt(userId))
   }
 
+  @ApiBearerAuth()
+  @Get('invite-trial/my')
+  @ApiOperation({ summary: '查询本月邀请码用量 + 已生成列表' })
+  myInviteTrial(@CurrentUser('sub') userId: string) {
+    return this.service.myInviteTrialCodes(BigInt(userId))
+  }
+
   @Post('wm-webhook')
   @ApiOperation({ summary: 'WM 发卡网 webhook 回调（W2 半自动同步）' })
   wmWebhook(@Body() dto: WmWebhookDto) {

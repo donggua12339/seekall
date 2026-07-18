@@ -4,15 +4,21 @@ import {
   BadRequestException,
   NotFoundException,
   ForbiddenException,
+  UnauthorizedException,
 } from '@nestjs/common'
 import { PrismaService } from '../../database/prisma.service'
+import { ConfigService } from '@nestjs/config'
+import { createHmac, timingSafeEqual } from 'crypto'
 import { randomBytes } from 'crypto'
 
 @Injectable()
 export class LicenseService {
   private readonly logger = new Logger(LicenseService.name)
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly configService: ConfigService,
+  ) {}
 
   /**
    * W1: Admin 手动生成 license code
@@ -113,6 +119,48 @@ export class LicenseService {
   }
 
   /**
+   * 查询用户本月邀请码用量 + 已生成列表
+   */
+  async myInviteTrialCodes(userId: bigint) {
+    const monthStart = new Date()
+    monthStart.setDate(1)
+    monthStart.setHours(0, 0, 0, 0)
+
+    const [monthCount, list] = await Promise.all([
+      this.prisma.license.count({
+        where: {
+          generatedBy: userId,
+          tier: 'trial',
+          createdAt: { gte: monthStart },
+        },
+      }),
+      this.prisma.license.findMany({
+        where: {
+          generatedBy: userId,
+          tier: 'trial',
+          note: 'invite-trial',
+        },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          code: true,
+          status: true,
+          createdAt: true,
+          usedAt: true,
+        },
+      }),
+    ])
+
+    return {
+      monthlyLimit: 3,
+      monthlyUsed: monthCount,
+      monthlyRemaining: 3 - monthCount,
+      monthStart: monthStart.toISOString(),
+      list,
+    }
+  }
+
+  /**
    * 用户兑换 license code
    * - 检查 code 是否有效
    * - 检查 trial 防羊毛（每账号限 1 次）
@@ -175,7 +223,11 @@ export class LicenseService {
 
   /**
    * W2: WM webhook 回调入口
-   * WM 付款成功 -> POST SeekAll -> 生成 code 入库
+   * WM 付款成功 -> POST SeekAll -> 验证签名 -> 生成 code 入库
+   *
+   * 签名算法（WM 约定）：
+   *   HMAC-SHA256(WM_WEBHOOK_SECRET, "${wmOrderId}|${tier}|${amount}")
+   *   前端 header: X-WM-Signature: <hex>
    */
   async handleWmWebhook(input: {
     wmOrderId: string
@@ -183,8 +235,34 @@ export class LicenseService {
     amount: number
     signature: string
   }) {
-    // TODO: 验证 WM webhook 签名（D17 实现）
-    this.logger.log(`WM webhook received: order=${input.wmOrderId} tier=${input.tier}`)
+    // 验证签名
+    const secret = this.configService.get<string>('WM_WEBHOOK_SECRET')
+    if (!secret) {
+      this.logger.error('WM_WEBHOOK_SECRET not configured')
+      throw new UnauthorizedException('Webhook secret not configured')
+    }
+
+    const expectedSig = createHmac('sha256', secret)
+      .update(`${input.wmOrderId}|${input.tier}|${input.amount}`)
+      .digest('hex')
+
+    if (!this.safeEqual(expectedSig, input.signature)) {
+      this.logger.warn(`WM webhook signature mismatch: order=${input.wmOrderId}`)
+      throw new UnauthorizedException('签名验证失败')
+    }
+
+    // 幂等检查：同 wmOrderId 已处理过则直接返回已存在的 license
+    const existing = await this.prisma.license.findFirst({
+      where: { note: { contains: `wm-order:${input.wmOrderId}` } },
+    })
+    if (existing) {
+      this.logger.log(`WM webhook duplicate: order=${input.wmOrderId}, return existing license`)
+      return existing
+    }
+
+    this.logger.log(
+      `WM webhook verified: order=${input.wmOrderId} tier=${input.tier} amount=${input.amount}`,
+    )
 
     return this.prisma.license.create({
       data: {
@@ -194,6 +272,18 @@ export class LicenseService {
         note: `wm-order:${input.wmOrderId}`,
       },
     })
+  }
+
+  /**
+   * 时序安全比较，防 side-channel attack
+   */
+  private safeEqual(a: string, b: string): boolean {
+    if (a.length !== b.length) return false
+    try {
+      return timingSafeEqual(Buffer.from(a, 'hex'), Buffer.from(b, 'hex'))
+    } catch {
+      return false
+    }
   }
 
   private formatCode(tier: 'trial' | 'monthly' | 'lifetime'): string {
