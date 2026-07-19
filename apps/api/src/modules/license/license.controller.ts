@@ -4,7 +4,7 @@ import { LicenseService } from './license.service'
 import { CurrentUser } from '../../common/decorators/current-user.decorator'
 import { Public } from '../../common/decorators/public.decorator'
 import { Roles } from '../../common/decorators/roles.decorator'
-import { IsString, IsInt, IsOptional, Min, Max, IsIn } from 'class-validator'
+import { IsString, IsInt, IsOptional, Min, Max, IsIn, IsNumber } from 'class-validator'
 
 class RedeemDto {
   @IsString() code!: string
@@ -13,7 +13,7 @@ class RedeemDto {
 class WmWebhookDto {
   @IsString() wmOrderId!: string
   @IsIn(['trial', 'monthly', 'lifetime']) tier!: 'trial' | 'monthly' | 'lifetime'
-  amount!: number
+  @IsNumber() amount!: number
   @IsString() signature!: string
 }
 
