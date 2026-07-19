@@ -4,39 +4,45 @@
 
 ## 标题（3 个备选）
 
-- A. 我做了一款规则引擎，让你自己决定搜什么
-- B. npm 包也能跑搜索？聊聊我做的 seekall-sdk
-- C. 技术分享：如何搭一个去中心化的搜索聚合工具
+- A. 我做了一款规则引擎 SDK，让你自己定义"搜什么"
+- B. npm 包也能跑规则？聊聊我做的 @seekall/sdk
+- C. 技术分享：如何用 TypeScript 搭一个中立的规则引擎
 
 ## 正文骨架（300-500 字）
 
 ```
 [痛点开头]
-我们搜网盘资源的时候，总是要打开 5-10 个网站复制粘贴关键词。
-有没有一个工具能让我在终端里一个命令搜完？
+做学术研究 / 技术调研的时候，经常要在 arxiv、crossref、pubmed 之间来回切，
+同一个关键词复制粘贴 3 遍。有没有一个工具能让我在终端里一个命令跑完所有源？
 
 [产品介绍]
-我做了一个 npm 包，核心思路是：
+我做了一个 npm 包 @seekall/sdk，核心思路是：
 - "搜索" = 一个规则数组
 - 你自己写规则（10 行代码 / 接官方 API）
 - SDK 在你本机跑，结果汇总去重
 - 完全客户端执行，服务端零接触
 
 [差异化]
-和市面上"xxx搜索"网站不一样：
-- 我不做网站服务
-- 我不内置任何指向网盘 / 磁力站的默认规则
-- 我做的是"规则引擎"，规则由社区贡献并标 5 级风险
+和市面上"xxx 聚合"网站不一样：
+- 我不做网站服务，只发 npm 包
+- 我不内置任何默认规则（默认 0 规则，自己装）
+- 我做的是"规则引擎"，规则通过 npm 分发，社区贡献并标 5 级风险评级
+
+[风险评级]
+L0 学术纯净（arxiv / crossref / pubmed）-> L1 通用开源 -> L2 社区评审
+-> L3/L4 高风险（仅 admin 可见，永不公开）
+工具中性合规设计，服务端零接触资源。
 
 [技术点]
-- monorepo（pnpm）
-- SDK 用 TypeScript，Rule interface 极简
+- monorepo（pnpm 9）+ TypeScript + tsup
+- Rule interface 极简（name + search + onHit 流式回调）
 - 规则通过 npm 分发（不是中心化仓库）
 - License 用 license key（不是订阅 SaaS）
 
 [CTA]
 项目地址 github.com/donggua12339/seekall
 AGPL 开源，欢迎贡献规则 / 提 issue。
+3 个 L0 示例规则已发 npm：@seekall/rule-arxiv / rule-crossref / rule-pubmed
 ```
 
 ## 红线（绝对不能写）
