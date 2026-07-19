@@ -1,481 +1,357 @@
 # CLAUDE.md - 觅源 SeekAll 项目宪章
 
-> 本文档是 SeekAll 项目的强制约束规范，所有代码必须遵守。AI 助手在协助开发时必须遵循本宪章。
+> 本文档是 SeekAll 项目的强制约束规范,所有代码必须遵守。AI 助手在协助开发时必须遵循本宪章。
+> v0.5 重构:从 Nuxt Web 搜索网站改为规则引擎 SDK + 市场 + BaaS。
 
 ## 项目简介
 
-- **中文名**：觅源
-- **英文名**：SeekAll
-- **类型**：全网资源聚合搜索引擎（网盘 / 磁力 / TG 频道 / 资源论坛）
-- **定位**：Z++ 方案 - 小圈子共享（50 人以内），邀请码注册，不公开宣传
-- **开源协议**：AGPL-3.0
-- **域名**：`seekall.winmelon.cn` + `admin.seekall.winmelon.cn`
+- **中文名**: 觅源
+- **英文名**: SeekAll
+- **版本**: v0.5.0
+- **定位**: 中立的搜索规则 SDK + 规则市场 + BaaS(默认 0 规则,工具中性合规)
+- **核心原则**: 服务端零接触资源,规则在用户本机跑,只做账号 / 规则市场列表 / DMCA 邮箱
+- **协议**: AGPL-3.0(SDK 核心) + MIT(插件)
+- **域名**: `seekall.winmelon.cn`(文档站)+ `admin.seekall.winmelon.cn`(admin SPA)
+- **仓库**: https://github.com/donggua12339/seekall
 
+## 5 条不可逾越的红线
+
+1. **不在 SDK 默认包里塞任何指向具体网盘 / 磁力 / 盗版站的 Rule**
+2. **L3/L4 规则永远不对非 admin 可见**(即使付费)
+3. **不做评论 / 评分 / 论坛功能**(违反 R4 永不)
+4. **不在 `apps/api/src/modules/rule/` 里出现 `axios` / `fetch` / `http.`**(服务端不能发 outbound 调用 L3/L4 资源站)
+5. **不集成支付 SDK**(用 WM 卡 SKU + webhook 就够)
 
 ## 技术栈
 
-| 层       | 选型                                            |
-| -------- | ----------------------------------------------- |
-| 前端     | Nuxt 3 + TypeScript + Naive UI + UnoCSS + Pinia |
-| 后端     | NestJS + Fastify + TypeScript + Prisma          |
-| 数据库   | MySQL 8 + Redis 7                               |
-| 全文检索 | Meilisearch                                     |
-| 任务队列 | BullMQ                                          |
-| 邮件     | Resend（主）+ QQ 邮箱 SMTP（备）                |
-| 反向代理 | Caddy                                           |
-| 容器化   | Docker Compose 单机                             |
-| API 文档 | Swagger（prod 关闭）                            |
-| 认证     | JWT Access (15m) + Refresh (7d) + argon2        |
-| monorepo | pnpm workspace                                  |
+| 层        | 选型                                                                                  |
+| --------- | ------------------------------------------------------------------------------------- |
+| SDK       | TypeScript + tsup(ESM,Node 20+)                                                       |
+| 后端      | NestJS 10 + Fastify + TypeScript + Prisma 5.22                                        |
+| 数据库    | MySQL 8 + Redis 7                                                                     |
+| 全文检索  | Meilisearch(v0.5 暂未用,v0.4.1 容器保留)                                              |
+| 任务队列  | BullMQ                                                                                |
+| 邮件      | Resend(主)+ QQ 邮箱 SMTP(备)                                                          |
+| 反向代理  | 雨云 apt nginx(1.18)+ Let's Encrypt(certbot)                                          |
+| 容器化    | Docker Compose v2 单机(6 服务: api / admin / docs-site / mysql / redis / meilisearch) |
+| API 文档  | Swagger(prod 关闭)                                                                    |
+| 认证      | JWT Access(15m)+ Refresh(7d)+ argon2                                                  |
+| 监控      | Sentry(API 已接,admin 前端已接)                                                       |
+| monorepo  | pnpm 9 workspace                                                                      |
+| 文档站    | VitePress 1.5(静态)                                                                   |
+| Admin SPA | Vue 3 + Vite + TypeScript + Naive UI + Pinia + UnoCSS                                 |
 
-## 目录结构
+## 目录结构(v0.5)
 
 ```
 seekall/
 ├── apps/
 │   ├── api/                      # NestJS 后端
 │   │   ├── src/
-│   │   │   ├── common/           # 公共（装饰器、过滤器、守卫、拦截器、管道、工具）
-│   │   │   ├── config/           # 配置
-│   │   │   ├── database/         # Prisma client
-│   │   │   ├── modules/          # 业务模块
-│   │   │   │   ├── auth/
-│   │   │   │   ├── user/
-│   │   │   │   ├── invite-code/
-│   │   │   │   ├── membership-code/
-│   │   │   │   ├── search/
-│   │   │   │   ├── provider/
-│   │   │   │   │   ├── interfaces/
-│   │   │   │   │   └── providers/
-│   │   │   │   ├── search-history/
-│   │   │   │   ├── favorite/
-│   │   │   │   ├── takedown/
-│   │   │   │   ├── blocked-keyword/
-│   │   │   │   ├── link-checker/
-│   │   │   │   ├── admin/
-│   │   │   │   ├── agreement/
-│   │   │   │   └── health/
-│   │   │   └── workers/          # BullMQ worker
+│   │   │   ├── common/           # 公共(装饰器 / 过滤器 / 守卫 / 拦截器)
+│   │   │   ├── config/           # env.validation
+│   │   │   ├── database/         # prisma / redis service
+│   │   │   └── modules/          # 业务模块(7 个)
+│   │   │       ├── auth/         # 注册 / 登录 / 邮箱验证 / 密码重置 / refresh / sessions
+│   │   │       ├── user/         # 个人资料
+│   │   │       ├── admin/        # dashboard / users / audit-logs / analytics / transparency
+│   │   │       ├── rule/         # 列表 / 提交 / 评审 / 终审 / takedown / subscribe / unsubscribe
+│   │   │       ├── license/      # generate / list / redeem / disable / invite-trial / wm-webhook
+│   │   │       ├── dmca/         # 公众提交 / admin 处理 / 透明度报告 cron
+│   │   │       ├── mail/         # Resend + QQ SMTP
+│   │   │       └── health/       # 健康检查
 │   │   ├── prisma/
-│   │   │   └── schema.prisma
+│   │   │   ├── schema.prisma     # 5 核心 + 4 辅助表
+│   │   │   ├── migrations/
+│   │   │   └── seed.ts
 │   │   ├── test/
-│   │   ├── Dockerfile
+│   │   ├── Dockerfile            # 两阶段 alpine + prisma engine
 │   │   ├── nest-cli.json
 │   │   ├── package.json
 │   │   └── tsconfig.json
-│   └── web/                      # Nuxt 3 前端
-│       ├── pages/
-│       ├── components/
-│       ├── composables/
-│       ├── stores/
-│       ├── plugins/
-│       ├── middleware/
-│       ├── assets/
-│       ├── public/
-│       ├── app.vue
-│       ├── nuxt.config.ts
-│       ├── Dockerfile
-│       ├── package.json
-│       └── tsconfig.json
+│   ├── admin/                    # Vue 3 Admin SPA
+│   │   ├── src/
+│   │   │   ├── api/              # axios + JWT 拦截器
+│   │   │   ├── stores/           # Pinia (auth + app)
+│   │   │   ├── router/           # 路由守卫 super_admin 检查
+│   │   │   ├── layouts/          # MainLayout (侧边栏 + 顶栏)
+│   │   │   └── views/            # 8 个页面
+│   │   │       ├── Login.vue
+│   │   │       ├── Dashboard.vue
+│   │   │       ├── dmca/List.vue + Detail.vue
+│   │   │       ├── rule/List.vue
+│   │   │       ├── license/List.vue
+│   │   │       ├── user/List.vue
+│   │   │       ├── AuditLogs.vue
+│   │   │       └── NotFound.vue
+│   │   ├── Dockerfile            # 两阶段 build (node:20-alpine -> nginx:alpine)
+│   │   ├── nginx.conf            # SPA fallback + 安全头 + noindex
+│   │   └── package.json
+│   └── docs-site/                # VitePress 静态文档站
+│       ├── .vitepress/
+│       │   └── config.ts
+│       ├── index.md              # 首页
+│       ├── guide/                # SDK 文档 + 5 个 quickstart
+│       ├── sdk/                  # 写规则 + API
+│       ├── compliance/           # DMCA webform + takedown + 透明度
+│       ├── admin/                # admin 使用手册(内部)
+│       └── Dockerfile
+├── packages/
+│   ├── sdk/                      # @seekall/sdk
+│   │   ├── src/
+│   │   │   ├── index.ts          # createEngine + Rule 接口 + Hit 类型
+│   │   │   └── cli.ts            # npx @seekall/sdk init [name]
+│   │   ├── tsup.config.ts        # 双 entry(index + cli)
+│   │   └── package.json          # bin: seekall
+│   ├── rule-arxiv/               # @seekall/rule-arxiv (L0 示例)
+│   ├── rule-crossref/            # @seekall/rule-crossref (L0 示例)
+│   └── rule-pubmed/              # @seekall/rule-pubmed (L0 示例)
 ├── docker/
-│   ├── docker-compose.yml
-│   ├── caddy/Caddyfile
-│   ├── mysql/init.sql
-│   └── ...
+│   ├── docker-compose.yml        # 6 服务(api/admin/docs-site/mysql/redis/meilisearch)
+│   ├── mysql/                    # init SQL + conf.d
+│   ├── redis/data/               # AOF 持久化
+│   ├── meilisearch/data/
+│   └── backups/mysql/            # cron 每天 3 点备份
+├── scripts/
+│   ├── sql/                      # 手动 migration SQL
+│   │   ├── add-dmca-notice-table.sql
+│   │   └── add-rule-subscription-review-tables.sql
+│   ├── e2e-v0.5-smoke.mjs        # e2e 测试(SDK + 合规 grep)
+│   ├── backup-cron.sh            # 数据库定时备份
+│   └── setup-admin.py            # admin 账号远程初始化
 ├── docs/
-├── .env.example
-├── .gitignore
-├── CLAUDE.md
-├── ARCHITECTURE.md
-├── README.md
-├── CHANGELOG.md
-├── LICENSE
+│   ├── dmca-notice-template.md   # DMCA Takedown Notice 邮件模板
+│   ├── xiaohongshu-draft.md      # 小红书软文草稿
+│   └── ops-issues-*.md           # 运维问题清单
+├── .eslintrc.cjs                 # root barrier + ignorePatterns
+├── .lintstagedrc.cjs             # 排除 apps/admin + apps/docs-site + packages
 ├── pnpm-workspace.yaml
-└── package.json
+├── package.json                  # husky 9 + lint-staged 15 + commitlint 19
+├── tsconfig.json
+└── CHANGELOG.md
 ```
 
-## 编码规范
-
-### TypeScript
-
-- `strict: true`，禁用 `any`
-- 优先 `interface`，类型推导不足时用 `type`
-- 显式标注返回类型
-
-### 命名约定
-
-| 类型       | 约定                      | 示例                     |
-| ---------- | ------------------------- | ------------------------ |
-| 文件名     | kebab-case                | `invite-code.service.ts` |
-| 类名       | PascalCase                | `InviteCodeService`      |
-| 接口名     | PascalCase（不加 I 前缀） | `Provider`               |
-| 函数/变量  | camelCase                 | `searchAll`              |
-| 常量       | UPPER_SNAKE_CASE          | `MAX_RESULTS`            |
-| 数据库表   | snake_case 复数           | `invite_codes`           |
-| 数据库字段 | snake_case                | `created_at`             |
-| API 路径   | kebab-case 复数           | `/api/v1/invite-codes`   |
-| 环境变量   | UPPER_SNAKE_CASE          | `DATABASE_URL`           |
-
-### 代码格式化
-
-- Prettier：2 空格缩进、单引号、无分号、行宽 100
-- ESLint：`@typescript-eslint/recommended`
-
-### Conventional Commits
-
-```
-feat: 新功能
-fix: 修复 bug
-docs: 文档
-style: 格式
-refactor: 重构
-perf: 性能优化
-test: 测试
-chore: 构建/工具
-ci: CI 配置
-```
-
-格式：`<type>(<scope>): <subject>`
-示例：`feat(provider): add pansou api integration`
-
-## 架构原则
-
-### 分层架构
-
-```
-Controller (路由 + 参数校验)
-    ↓
-Service (业务逻辑)
-    ↓
-Repository (数据访问，Prisma 封装)
-    ↓
-Database
-```
-
-- Controller 不写业务逻辑
-- Service 不直接操作 HTTP 上下文
-- Repository 封装 Prisma
-
-### 依赖注入
-
-- 所有 Service 通过 DI 注入
-- Provider 通过 `@Inject(PROVIDER_TOKEN)` 注入
-- 禁止 `new` 创建依赖
-
-### 接口防腐层 (ACL)
-
-- 外部 API 调用必须封装在 Provider 内
-- 外部数据格式不能泄漏到 Service 层
-
-### 错误隔离
-
-- Provider 异常不传播到主流程
-- 单源失败 -> 降级返回空结果 + 日志告警
-
-### 限流降级
-
-- 单 Provider 超时 10s（PanSou API 响应慢，5s 不够）
-- 全局搜索超时 15s
-- Provider 多 URL 故障转移 + 重试（最多 2 次，间隔 1s）
-- Redis 缓存热门查询 1h（v0.2 分级 TTL：热门 1h / 长尾 10min / 空结果 30s）
-- 空结果不缓存（避免失败被缓存，v0.2 改为短缓存防穿透）
-- 慢查询降级返回缓存或空结果
-
-## API 设计规范
-
-### RESTful
-
-- 资源用复数名词：`/api/v1/users`
-- CRUD：GET / POST / PATCH / DELETE
-
-### 统一响应格式
-
-```typescript
-// 成功
-{ "code": 0, "data": { ... }, "message": "ok" }
-
-// 失败
-{ "code": 40001, "data": null, "message": "邀请码无效" }
-```
-
-### 错误码体系
-
-```
-0       - 成功
-1xxxx   - 通用错误（10001 参数错误、10002 未授权、10003 禁止访问）
-2xxxx   - 认证错误（20001 邀请码无效、20002 密码错误、20003 Token 过期、20004 邮箱未验证）
-3xxxx   - 资源错误（30001 资源不存在、30002 资源已下架）
-4xxxx   - 搜索错误（40001 搜索超时、40002 无可用 Provider）
-5xxxx   - 系统错误（50000 内部错误、50001 数据库错误）
-```
-
-### 分页约定
-
-```
-请求：?page=1&pageSize=20
-响应：{ "list": [...], "total": 100, "page": 1, "pageSize": 20, "totalPages": 5 }
-```
-
-### 版本控制
-
-- URL 版本：`/api/v1/...`
-- 破坏性变更升版本号，旧版本保留 6 个月
-
-## 安全规范
-
-### 输入校验
-
-- 所有请求用 class-validator DTO 校验
-- 字符串长度、格式、范围必须显式约束
-
-### SQL 注入
-
-- Prisma 参数化查询，禁止 raw SQL 拼接
-
-### XSS 防护
-
-- Vue 模板默认转义
-- 存储前用 `sanitize-html` 净化 HTML 内容
-
-### 速率限制
-
-- 全局：每 IP 100 次/分钟
-- 搜索：每用户 30 次/分钟
-- 登录：每 IP 5 次/分钟
-- 注册：每 IP 3 次/小时
-- 密码重置：每 IP 3 次/小时
-
-### 敏感数据
-
-- 密码用 argon2 哈希
-- JWT Secret 从环境变量读取
-- `.env` 不进 Git
-- 邀请码与 WM 订单号绑定，可追溯
-
-## 测试规范
-
-### 工具
-
-- Jest（NestJS 默认）
-
-### 分层
-
-- 单元测试：Service 层（mock Repository）、Provider 层（mock 外部 API）
-- 集成测试：Controller + Service + Repository（用真实 MySQL test 库）
-- E2E 测试：v0.2
-
-### 覆盖率
-
-- 核心模块 70%+
-
-## Git 工作流
-
-### 分支策略
-
-- `main`：生产分支，受保护
-- `develop`：开发主分支
-- `feature/xxx`：功能分支
-- `fix/xxx`：修复分支
-- `release/x.x.x`：发布分支
-
-### 预提交钩子
-
-- husky + lint-staged
-- 提交前自动 lint + format
-- commitlint 校验提交信息格式
-
-## Provider 开发规范
-
-### 必须实现接口
-
-```typescript
-interface Provider {
-  readonly name: string;
-  readonly displayName: string;
-  readonly category: "netdisk" | "magnet" | "tg" | "forum";
-  search(query: SearchQuery): Promise<SearchResult[]>;
-  healthCheck(): Promise<boolean>;
-}
-```
-
-### 必须处理
-
-- 超时（5s）
-- 错误降级（返回空数组）
-- 限流（自身被源站限流时退避）
-
-### 不允许
-
-- 直接抛错到主流程
-- 修改全局状态
-- 依赖其他 Provider
-
-## 开发命令
+## 数据库 schema(v0.5)
+
+5 张核心表 + 4 张辅助表:
+
+### 核心
+
+| 表                 | 用途                                                                |
+| ------------------ | ------------------------------------------------------------------- |
+| `users`            | 用户(super_admin / user + isPaid + tier + status)                   |
+| `licenses`         | License code(trial / monthly / lifetime + unused / used / disabled) |
+| `rules`            | 规则市场(npmPackage + riskLevel + status + takedownCount)           |
+| `admin_audit_logs` | 所有 admin 操作 + Rule 评审历史                                     |
+| `configs`          | key-value 系统(透明度报告持久化)                                    |
+
+### 辅助
+
+| 表                   | 用途                                              |
+| -------------------- | ------------------------------------------------- |
+| `license_claims`     | LicenseClaim 防 trial 羊毛(每账号限领 1 次)       |
+| `rule_subscriptions` | 规则订阅(unique [userId, ruleId] 幂等)            |
+| `rule_reviews`       | L2 规则评审(unique [ruleId, reviewerId] 一人一票) |
+| `dmca_notices`       | DMCA Takedown 记录(永不删除)                      |
+
+### 枚举
+
+- `UserRole`: super_admin / user
+- `UserStatus`: pending_verification / active / banned / deleted
+- `LicenseTier`: trial / monthly / lifetime
+- `LicenseStatus`: unused / used / disabled
+- `RuleRiskLevel`: l0 / l1 / l2 / l3 / l4
+- `RuleStatus`: pending_review / published / taken_down / banned
+- `DmcaReporterRole`: owner / agent
+- `DmcaNoticeStatus`: pending / verified / actioned / rejected
+
+## API 模块(v0.5)
+
+### 公开端点
+
+- `POST /api/v1/auth/register` 注册
+- `POST /api/v1/auth/login` 登录
+- `POST /api/v1/auth/verify-email` 邮箱验证
+- `POST /api/v1/auth/request-password-reset` 申请重置
+- `POST /api/v1/auth/reset-password` 重置密码
+- `POST /api/v1/auth/refresh` 刷新 token
+- `GET /api/v1/health` 健康检查
+- `GET /api/v1/rules` 规则列表(L0-L2 公开)
+- `GET /api/v1/rules/:id` 规则详情
+- `POST /api/v1/license/wm-webhook` WM 发卡网回调
+- `POST /api/v1/dmca/notice` DMCA 提交(每 IP 3 次/小时)
+- `GET /api/v1/dmca/transparency` 透明度报告(默认上月)
+- `GET /api/v1/dmca/transparency/history` 历史报告列表
+- `GET /api/v1/dmca/transparency/:yearMonth` 指定月报告
+
+### 用户端点(Bearer JWT)
+
+- `GET /api/v1/auth/sessions` 登录设备列表
+- `DELETE /api/v1/auth/sessions/:id` 撤销会话
+- `POST /api/v1/auth/logout` 退出
+- `GET /api/v1/user/me` 个人资料
+- `PATCH /api/v1/user/me` 修改资料
+- `POST /api/v1/rules` 提交规则(L0/L1 自动上架,L2 评审)
+- `POST /api/v1/rules/:id/review` 评审 L2 规则(需付费会员)
+- `POST /api/v1/rules/:id/subscribe` 订阅(幂等)
+- `DELETE /api/v1/rules/:id/subscribe` 取消订阅
+- `GET /api/v1/rules/my/subscriptions` SDK 拉取订阅
+- `POST /api/v1/license/redeem` 兑换 license code
+- `POST /api/v1/license/invite-trial` 老用户生成 ¥1 试用邀请码(每月 3 个)
+- `GET /api/v1/license/invite-trial/my` 本月邀请码用量
+
+### Admin 端点(Bearer JWT + super_admin)
+
+- `GET /api/v1/admin/dashboard` 控制台数据
+- `GET /api/v1/admin/users` 用户列表
+- `PATCH /api/v1/admin/users/:id/ban` 封禁
+- `PATCH /api/v1/admin/users/:id/unban` 解封
+- `GET /api/v1/admin/audit-logs` 审计日志
+- `GET /api/v1/admin/transparency` 透明度报告
+- `POST /api/v1/admin/rules` 创建 L3/L4 规则
+- `POST /api/v1/admin/rules/:id/final-review` 终审 L2
+- `POST /api/v1/admin/rules/:id/takedown` DMCA 下架
+- `POST /api/v1/admin/license/generate` 生成 license(批量)
+- `GET /api/v1/admin/license` license 列表
+- `GET /api/v1/admin/license/:id` license 详情
+- `POST /api/v1/admin/license/:id/disable` 禁用
+- `GET /api/v1/admin/dmca` DMCA 举报列表
+- `GET /api/v1/admin/dmca/:id` 详情
+- `POST /api/v1/admin/dmca/:id/handle` 处理(verify / action / reject)
+
+## 5 级风险评级 + 5 维权限矩阵
+
+| 级别 | 含义                                | 可见     | 可订阅 |
+| ---- | ----------------------------------- | -------- | ------ |
+| L0   | 学术纯净(arxiv / crossref / pubmed) | 所有人   | 免费   |
+| L1   | 通用开源(GitHub API)                | 所有人   | 免费   |
+| L2   | 社区评审(需付费会员评审)            | 所有人   | 付费   |
+| L3   | 高风险(admin 创建,仅 admin 可见)    | 仅 admin | 永不   |
+| L4   | 极高风险(admin 创建,仅 admin 可见)  | 仅 admin | 永不   |
+
+5 维权限矩阵: View / Run / Save / Upload / Author
+
+## 会员档位
+
+| 档位     | 价格 | 时长   | 权限                             |
+| -------- | ---- | ------ | -------------------------------- |
+| trial    | ¥1   | 7 天   | L0-L1 订阅                       |
+| monthly  | ¥18  | 30 天  | L0-L2 订阅 + 评审权 + 邀请码生成 |
+| lifetime | ¥68  | 100 年 | 同 monthly                       |
+
+## 部署信息
+
+- **服务器**: HK <REDACTED_SERVER_IP>:22022(雨云,无备案)
+- **SSH 用户**: `<REDACTED_SSH_USER>`(sudoers 白名单: docker / nginx / xray / git)
+- **项目目录**: `/opt/seekall-v0.5`
+- **归档备份**: `/opt/seekall-v0.4.1-archive-20260718`(v0.4.1 全量备份)
+- **DNS**: `seekall.winmelon.cn` + `admin.seekall.winmelon.cn` -> <REDACTED_SERVER_IP>
+- **nginx**: 雨云 apt nginx,反代到 docker 容器 IP
+  - `seekall.winmelon.cn` -> docs-site 172.18.0.6:80 + api 172.18.0.5:7301
+  - `admin.seekall.winmelon.cn` -> admin 172.18.0.7:80
+
+## 容器 IP 分配(固定)
+
+| 容器                | IP         | 端口            |
+| ------------------- | ---------- | --------------- |
+| seekall-api         | 172.18.0.5 | 7301(内部)      |
+| seekall-docs-site   | 172.18.0.6 | 80(内部)        |
+| seekall-admin       | 172.18.0.7 | 80(内部)        |
+| seekall-mysql       | 172.18.0.x | 3306(127.0.0.1) |
+| seekall-redis       | 172.18.0.x | 6379(127.0.0.1) |
+| seekall-meilisearch | 172.18.0.x | 7700(127.0.0.1) |
+
+## 常用命令
 
 ```bash
-# 安装依赖
-pnpm install
+# API 编译验证
+cd apps/api && rm -rf dist && npx nest build
 
-# 启动开发环境（前后端并行）
-pnpm dev
+# Admin SPA 编译
+cd apps/admin && pnpm run build
 
-# 构建
-pnpm build
+# SDK 编译
+pnpm --filter @seekall/sdk build
 
-# Lint
-pnpm lint
+# e2e smoke 测试(本地,跳过 server)
+node scripts/e2e-v0.5-smoke.mjs --skip-server
 
-# 测试
-pnpm test
+# 单元测试
+cd apps/api && npx jest
 
-# 格式化
-pnpm format
+# Prisma generate(改 schema 后)
+cd apps/api && npx prisma generate
 
-# Prisma
-pnpm --filter api prisma:migrate
-pnpm --filter api prisma:generate
-pnpm --filter api prisma:studio
-
-# Docker 部署
-cd docker
-docker compose up -d
+# 服务器部署(完整流程)
+# 1. 本地 commit + push
+git add -A && git commit -m "..." && git push origin master
+# 2. 服务器拉取
+ssh <REDACTED_SSH_USER>@<REDACTED_SERVER_IP>
+cd ~/seekall && git pull origin master
+# 3. cp /opt/seekall-v0.5(docker run --rm -v 方案,sudoers 限制)
+sudo docker run --rm -v /opt:/opt -v /home/<REDACTED_SSH_USER>:/home alpine:3.18 sh -c "
+  rm -rf /opt/seekall-v0.5
+  cp -a /home/seekall /opt/seekall-v0.5
+  chown -R root:root /opt/seekall-v0.5
+  cp /opt/seekall-v0.4.1-archive-20260718/.env.v0.4.1 /opt/seekall-v0.5/.env
+  cp /opt/seekall-v0.4.1-archive-20260718/.env.production.v0.4.1 /opt/seekall-v0.5/.env.production
+  cp /opt/seekall-v0.5/.env /opt/seekall-v0.5/docker/.env
+"
+# 4. SQL migration(如有 schema 改动)
+cd /opt/seekall-v0.5/docker
+sudo docker exec -i seekall-mysql mysql -uroot -p$MYSQL_ROOT_PASSWORD seekall < /opt/seekall-v0.5/scripts/sql/add-xxx.sql
+# 5. 重建容器
+sudo docker compose build seekall-api seekall-admin
+sudo docker compose up -d --no-deps seekall-api seekall-admin
+# 6. 验证
+curl http://172.18.0.5:7301/api/v1/health
+curl http://172.18.0.7/health
 ```
 
-## 部署流程
+## 已知踩过的坑(供参考)
 
-1. 拉取最新代码到香港服务器
-2. `cp .env.example .env` 并填写生产配置
-3. `cd docker && docker compose up -d --build`
-4. Prisma 自动执行 `migrate deploy`
-5. 创建超级管理员账户（首次部署）：`pnpm --filter api cli:setup-admin`
-6. Caddy 自动申请 HTTPS 证书
-7. 验证 `https://seekall.winmelon.cn/api/v1/health`
+1. **sudoers 限制** - `<REDACTED_SSH_USER>` 只能 sudo docker / nginx / xray / git,不能 sudo cp / nohup / bash 内部命令
+   - 复制文件到 /opt 用 `sudo docker run --rm -v /opt:/opt alpine cp ...`
+2. **SSH key + sudo git** - `sudo git` 会重置 HOME,读不到 SSH config,git pull 失败
+   - 解决: 先在 <REDACTED_SSH_USER> home git pull,再用 docker cp 到 /opt
+3. **LXD 嵌套容器 docker exec breakout** - `docker exec CMD` 形式报 "container breakout detected"
+   - 解决: healthcheck 改用 `CMD-SHELL`(redis/mysql 已修)
+4. **lint-staged 路径含空格** - "Claude Code Haha" 路径含空格,ESLint 报 "No files matching pattern"
+   - 解决: `.lintstagedrc.cjs` 用函数形式 + `quote()` 包引号 + 排除 apps/admin / apps/docs-site / packages
+5. **v0.5 不在 /opt/seekall-v0.5/.git** - 服务器上的 /opt/seekall-v0.5 是从 home seekall cp 来的,git 历史在 ~/seekall
+6. **Prisma JsonFilter 不支持 path+equals** - 改用 findMany 后端 `.filter()` 处理
+7. **AdminAuditLog.targetId 可空** - findMany 后必须 `.filter((x): x is bigint => x !== null)`
+8. **commitlint subject 大写报错** - subject 必须小写,footer 行宽 ≤100
+9. **ESM shebang 不工作** - Node ESM 解析报错,SDK CLI 不加 banner,由 npm bin 字段处理
 
-## 数据保留策略
+## v0.5 已完成里程碑
 
-| 数据            | 保留    | 清理方式              |
-| --------------- | ------- | --------------------- |
-| 用户数据        | 永久    | 软删除 `deleted_at`   |
-| 搜索历史        | 永久    | 用户手动 / 管理员清理 |
-| 搜索日志        | 90 天   | 定时任务              |
-| 收藏夹          | 永久    | 用户手动              |
-| takedown 记录   | 永久    | 不清理（合规证据）    |
-| 邮件/重置 token | 30 分钟 | 过期自动清理          |
-| Redis 缓存      | 1 小时  | TTL 自动              |
-| 管理员审计日志  | 1 年    | 定时任务              |
+- ✅ D1-D5: 砍 Nuxt + vitepress + schema 重写 + README
+- ✅ D6-D10: SDK 核心 + 3 个示例规则 + 文档
+- ✅ D11-D15: BaaS 最小化(auth / license / rule / admin / audit)
+- ✅ D16-D20: docs-site 部署 + WM webhook + DMCA + e2e
+- ✅ P1 修复(docs-site healthcheck + rules 校验)
+- ✅ P2-1 DMCA webform 后端 API
+- ✅ P2-2 RuleSubscription 独立表
+- ✅ P2-3 admin SPA 完整(8 页面 + Dockerfile)
+- ✅ P3 服务器部署(DNS + nginx + SQL migration + docker compose)
+- ✅ P4 Redis healthcheck + CHANGELOG + 透明度 cron + SDK CLI + admin Sentry + 单元测试
+- ✅ 清理 v0.4.1 残留(apps/browser-extension / apps/dht-crawler / apps/tg-bot / apps/tg-collector / services/ / systemd)
 
-## 失效链接检测
+## 待办
 
-- BullMQ 定时任务，每天 3:00 执行
-- HEAD 请求，超时 5s，并发 10
-- 状态：`unknown` / `active` / `dead` / `checking`
-- 搜索结果过滤 `dead` 链接
-- 用户可手动举报失效
+- HTTPS 真证书替换自签(任务 #12 pending)
+- WM 卡 webhook 实测(等 WM 后台配置)
+- 3 个示例规则 npm publish
+- 小红书软文发布
+- DMCA Agent 注册(用户量起来后)
+- M2: 社群评审 UI 完善(评审工作流后端已建,前端待补)
+- M3: DMCA webform 后端 API 接入(已完成,可考虑加 admin 复核 UI)
 
-## 版本号约定（SemVer）
+## 联系方式
 
-- **v0.1.0** - MVP（已完成 2026-07-13）
-- **v0.2.0** - 稳定加固 + 功能扩展（已完成 2026-07-13）
-- **v0.3.0** - 运营准备（已完成 2026-07-13）
-- **v0.3.1** - 体验优化（已完成 2026-07-14）
-- **v0.3.2** - 资源管理+运营（已完成 2026-07-14）
-- **v0.3.3** - 生态扩展（已完成 2026-07-14）
-- **v0.4.0** - Provider 扩展（已完成 2026-07-14）
-- **v0.4.1** - 高级功能（已完成 2026-07-14）
-- **v1.0.0** - 正式发布（等正式运营 + 开源公开后）
-
-## 当前阶段
-
-**v0.4.1 已完成** - 等待正式运营部署
-
-### v0.4.1 高级功能（已完成 2026-07-14）
-
-- [x] AI 资源标签（基于标题规则匹配自动分类）
-- [x] AI 资源推荐（基于搜索历史 + Meilisearch 相似度）
-- [x] 关键词订阅 + 邮件通知（每 2 小时检查）
-- [x] 资源有效性投票（群体智慧维护）
-- [x] 字幕搜索（对接 OpenSubtitles API）
-- [x] 字幕配置教程（docs/SUBTITLE-GUIDE.md）
-- [x] 下载队列（对接 aria2 JSON-RPC）
-- [x] 资源合集（主题合集 + 资源管理）
-- [x] PWA 支持（manifest + theme-color）
-- [x] 搜索历史时间线（日期分组时间轴）
-- [x] 资源封面图墙（Netflix 风格 grid）
-- [x] Provider 自动降级（健康度 < 30 禁用，> 70 恢复）
-- [x] 快捷键帮助面板 + 主题切换按钮
-
-### v0.4.0 Provider 扩展（已完成 2026-07-14）
-
-- [x] TG 频道直连（独立 tg-collector 服务）
-- [x] 资源论坛 Provider（通用框架）
-- [x] DHT 自爬（独立 dht-crawler 服务）
-- [x] 夸克网盘转存（完整 API 逆向）
-- [x] 自定义 Provider 插件文档
-
-### v0.3.3 生态扩展（已完成 2026-07-14）
-
-- [x] API Key 权限细分（scopes）
-- [x] Telegram Bot
-- [x] 浏览器插件
-
-### v0.3.2 资源管理+运营（已完成 2026-07-14）
-
-- [x] 资源详情页 + 分享卡片
-- [x] 登录设备管理
-- [x] Provider 健康度评分
-- [x] 用户行为分析面板
-
-### v0.3.1 体验优化（已完成 2026-07-14）
-
-- [x] 搜索建议/过滤/排序/快捷键/收藏夹分组
-
-### v0.3.0 运营准备（已完成 2026-07-13）
-
-- [x] 部署脚本 + 生产配置 + 部署文档
-- [x] 开源文档（README/CONTRIBUTING/Issue模板）
-- [x] Sentry 监控配置
-
-### v0.2.0 稳定加固 + 功能扩展（已完成 2026-07-13）
-
-- [x] 性能优化（缓存分级 TTL + Provider 流式返回）
-- [x] GitHub OAuth 登录
-- [x] API 开放（API Key 鉴权 + 限流）
-- [x] husky/eslint 修复 + Prisma 迁移 + 测试覆盖率达标
-
-### v0.1.0 MVP（已完成 2026-07-13）
-
-- [x] 11 项必做 + 9 项超额（TG频道/模糊搜索/Sentry等）
-
-### 待运营部署
-
-- 部署到香港服务器（裸机 + PM2 + Caddy）
-- 域名 HTTPS（seekall.winmelon.cn）
-- Resend 域名验证
-- UptimeRobot 监控接入
-- 开源公开（GitHub 仓库转 public）
-
-## 版本历史（CHANGELOG 摘要）
-
-### v0.4.1（2026-07-14）- 高级功能
-AI 标签/推荐、关键词订阅通知、有效性投票、字幕搜索+教程、下载队列、资源合集、PWA、时间线、图墙、Provider 自动降级
-
-### v0.4.0（2026-07-14）- Provider 扩展
-TG 直连、资源论坛、DHT 自爬、夸克转存
-
-### v0.3.3（2026-07-14）- 生态扩展
-API Key 权限、TG Bot、浏览器插件
-
-### v0.3.2（2026-07-14）- 资源管理+运营
-详情页、分享卡片、设备管理、健康度、分析面板
-
-### v0.3.1（2026-07-14）- 体验优化
-搜索建议/过滤/排序/快捷键/收藏夹分组
-
-### v0.3.0（2026-07-13）- 运营准备
-部署脚本、生产配置、开源文档、Sentry
-
-### v0.2.0（2026-07-13）- 稳定加固 + 功能扩展
-性能优化、GitHub OAuth、API 开放、技术债务清理
-
-### v0.1.0（2026-07-13）- MVP
-11 项必做 + 9 项超额
+- **GitHub**: https://github.com/donggua12339/seekall
+- **最新 commit**: 见 `git log --oneline -1`
+- **部署文档**: `/opt/seekall-v0.5/CHANGELOG.md`
+- **admin 手册**: `apps/docs-site/admin/guide.md`
+- **运维清单**: `docs/ops-issues-*.md`
