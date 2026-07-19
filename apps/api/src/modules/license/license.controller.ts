@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Post, Query, ParseIntPipe } from '@nestjs
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger'
 import { LicenseService } from './license.service'
 import { CurrentUser } from '../../common/decorators/current-user.decorator'
+import { Public } from '../../common/decorators/public.decorator'
 import { Roles } from '../../common/decorators/roles.decorator'
 import { IsString, IsInt, IsOptional, Min, Max, IsIn } from 'class-validator'
 
@@ -55,6 +56,7 @@ export class LicenseController {
     return this.service.myInviteTrialCodes(BigInt(userId))
   }
 
+  @Public()
   @Post('wm-webhook')
   @ApiOperation({ summary: 'WM 发卡网 webhook 回调（W2 半自动同步）' })
   wmWebhook(@Body() dto: WmWebhookDto) {
