@@ -25,6 +25,9 @@ RUN cd apps/user-spa && pnpm run build
 # Stage 2: nginx serve static
 FROM nginx:alpine
 
+# 删默认配置(避免 default.conf 抢占 80 端口,导致 SPA fallback 不生效)
+RUN rm /etc/nginx/conf.d/default.conf
+
 # 替换默认配置
 COPY apps/user-spa/nginx.conf /etc/nginx/conf.d/user-spa.conf
 COPY --from=builder /app/apps/user-spa/dist /usr/share/nginx/html
