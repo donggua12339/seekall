@@ -368,9 +368,25 @@ importers:
         version: 5.9.3
 
   packages/sdk:
+    dependencies:
+      '@seekall/rule-arxiv':
+        specifier: ^0.5.0
+        version: 0.5.0
+      '@seekall/rule-crossref':
+        specifier: ^0.5.0
+        version: 0.5.0
+      '@seekall/rule-pubmed':
+        specifier: ^0.5.0
+        version: 0.5.0
+      chalk:
+        specifier: ^5.6.2
+        version: 5.6.2
+      commander:
+        specifier: ^15.0.0
+        version: 15.0.0
     devDependencies:
       '@types/node':
-        specifier: ^20.0.0
+        specifier: ^20.19.43
         version: 20.19.43
       tsup:
         specifier: ^8.0.0
@@ -2011,6 +2027,23 @@ packages:
     cpu: [x64]
     os: [win32]
 
+  '@seekall/rule-arxiv@0.5.0':
+    resolution: {integrity: sha512-RnJ1gTpcVpf9EPrxyZRiEQQGOxczrQbOoB268t/ck64xBJhS5SbLtjMHItL5hHvxeKXSW6pHqSR8+THprfl6WA==}
+    engines: {node: '>=20.0.0'}
+
+  '@seekall/rule-crossref@0.5.0':
+    resolution: {integrity: sha512-j08EBVWhvnaeTwwETv04hv7832XxqM2klkzWuYyer8j4rB1C812gCx6XY4vVY7J/feKTWHe+IddimQBfNQ9XPw==}
+    engines: {node: '>=20.0.0'}
+
+  '@seekall/rule-pubmed@0.5.0':
+    resolution: {integrity: sha512-DndXZUEftHKA7AddtidpdWCOOu23O+ONZF0QyzReZf+yQoqlGtPktnS1U1zBuZmbX2y6SeuwY17X254ujnQiJg==}
+    engines: {node: '>=20.0.0'}
+
+  '@seekall/sdk@0.5.0':
+    resolution: {integrity: sha512-GZQ2ffglhcpG/dpn+tAzZW6uJkzRIcNGxSINIvH3dzHU6+tmlEp/dGy9hQFbXAaim1IBXEXLucCT1E3U8TDzjg==}
+    engines: {node: '>=20.0.0'}
+    hasBin: true
+
   '@selderee/plugin-htmlparser2@0.11.0':
     resolution: {integrity: sha512-P33hHGdldxGabLFjPPpaTxVolMrzrcegejx+0GxjrIb9Zv48D8yAIA/QTDR2dFl7Uz7urX8aX6+5bCZslr+gWQ==}
 
@@ -3109,6 +3142,10 @@ packages:
   commander@13.1.0:
     resolution: {integrity: sha512-/rFeCpNJQbhSZjGVwO9RFV3xPqbnERS8MmIQzCtD/zl6gpJuV/bMLuN92oG3F7d8oDEHHRrujSXNUr8fpjntKw==}
     engines: {node: '>=18'}
+
+  commander@15.0.0:
+    resolution: {integrity: sha512-z67u4ZhzCL/Tydu1lJARtEZYWbWaN7oYLHbsuzocr6y4N6WZAagG3RQ4FW61V1/0+jImpj293XfrcYnd1qxtPg==}
+    engines: {node: '>=22.12.0'}
 
   commander@2.20.3:
     resolution: {integrity: sha512-GpVkmM8vF2vQUkj2LvZmD35JxeJOLCwJ9cUkugyk2nuhbv3+mJvpLYYt+0+USMxE+oj+ey/lJEnhZw75x/OMcQ==}
@@ -8397,6 +8434,20 @@ snapshots:
   '@rollup/rollup-win32-x64-msvc@4.62.2':
     optional: true
 
+  '@seekall/rule-arxiv@0.5.0':
+    dependencies:
+      '@seekall/sdk': 0.5.0
+
+  '@seekall/rule-crossref@0.5.0':
+    dependencies:
+      '@seekall/sdk': 0.5.0
+
+  '@seekall/rule-pubmed@0.5.0':
+    dependencies:
+      '@seekall/sdk': 0.5.0
+
+  '@seekall/sdk@0.5.0': {}
+
   '@selderee/plugin-htmlparser2@0.11.0':
     dependencies:
       domhandler: 5.0.3
@@ -9742,6 +9793,8 @@ snapshots:
   commander@10.0.1: {}
 
   commander@13.1.0: {}
+
+  commander@15.0.0: {}
 
   commander@2.20.3: {}
 

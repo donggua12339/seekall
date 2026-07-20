@@ -22,8 +22,16 @@ export default defineConfig([
     sourcemap: false,
     splitting: false,
     shims: false,
-    // ESM shebang: 用 Node 20+ 原生支持，不加 banner
+    // ESM shebang: 用 Node 20+ 原生支持,不加 banner
     // CLI 入口文件由 package.json bin 字段指向 dist/cli.js
     // npx @seekall/sdk init 实际执行: node dist/cli.js
+    // 规则包(@seekall/rule-*)作为动态 import,需标记 external(运行时由用户安装)
+    external: [
+      '@seekall/rule-arxiv',
+      '@seekall/rule-crossref',
+      '@seekall/rule-pubmed',
+      '@seekall/rule-github',
+      '@seekall/rule-hackernews',
+    ],
   },
 ])
