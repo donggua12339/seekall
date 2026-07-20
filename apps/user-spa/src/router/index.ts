@@ -50,6 +50,30 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '我的订阅' },
       },
       {
+        path: 'transactions',
+        name: 'transactions',
+        component: () => import('@/views/billing/Transactions.vue'),
+        meta: { title: '交易记录' },
+      },
+      {
+        path: 'receipts/request',
+        name: 'receipt-request',
+        component: () => import('@/views/billing/ReceiptRequest.vue'),
+        meta: { title: '申请收据' },
+      },
+      {
+        path: 'renew',
+        name: 'renew',
+        component: () => import('@/views/billing/Renew.vue'),
+        meta: { title: '续费' },
+      },
+      {
+        path: 'refunds/request',
+        name: 'refund-request',
+        component: () => import('@/views/billing/RefundRequest.vue'),
+        meta: { title: '申请退款' },
+      },
+      {
         path: 'settings',
         name: 'settings',
         component: () => import('@/views/Settings.vue'),

@@ -32,6 +32,8 @@ const menuOptions = computed<MenuOption[]>(() => [
   { label: '提交规则', key: 'rule-submit', icon: renderIcon('➕') },
   { label: '我的 License', key: 'my-licenses', icon: renderIcon('🔑') },
   { label: '我的订阅', key: 'my-subscriptions', icon: renderIcon('⭐') },
+  { label: '交易记录', key: 'transactions', icon: renderIcon('💰') },
+  { label: '续费', key: 'renew', icon: renderIcon('🔄') },
   { label: 'DMCA 举报', key: 'dmca-submit', icon: renderIcon('⚠️') },
   { label: '账号设置', key: 'settings', icon: renderIcon('⚙️') },
 ])
