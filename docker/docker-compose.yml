@@ -72,7 +72,7 @@ services:
     restart: unless-stopped
     networks:
       seekall-net:
-        ipv4_address: 172.18.0.8  # 固定 IP（nginx 反代 user.seekall.winmelon.cn）
+        ipv4_address: 172.18.0.9  # 固定 IP(172.18.0.8 被 dht-meilisearch v0.4.1 遗留占用)
     healthcheck:
       test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1/health']
       interval: 30s
