@@ -38,8 +38,22 @@ export interface AuditLog {
   createdAt: string
 }
 
+export interface Analytics {
+  days: number
+  since: string
+  metrics: {
+    newUsers: number
+    newLicenses: number
+    newRules: number
+    reviews: number
+    takedowns: number
+  }
+}
+
 export const adminApi = {
   dashboard: () => http.get<unknown, Dashboard>('/admin/dashboard'),
+  analytics: (days: number = 7) =>
+    http.get<unknown, Analytics>('/admin/analytics', { params: { days } }),
   listUsers: (params: { page?: number; pageSize?: number; search?: string }) =>
     http.get<unknown, UserListRes>('/admin/users', { params }),
   banUser: (id: string, reason: string) =>

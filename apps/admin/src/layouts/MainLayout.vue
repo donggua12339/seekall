@@ -19,6 +19,7 @@ function renderIcon(emoji: string) {
 
 const menuOptions = computed<MenuOption[]>(() => [
   { label: '数据概览', key: 'dashboard', icon: renderIcon('📊') },
+  { label: '数据分析', key: 'analytics', icon: renderIcon('📈') },
   { label: 'DMCA 举报', key: 'dmca', icon: renderIcon('⚠️') },
   { label: '规则评审', key: 'rules', icon: renderIcon('📋') },
   { label: 'License 管理', key: 'licenses', icon: renderIcon('🔑') },
