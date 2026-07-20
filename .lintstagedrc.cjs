@@ -8,6 +8,7 @@ const isProjectFile = (p) => {
   return (
     !n.includes("/apps/docs-site/") &&
     !n.includes("/apps/admin/") &&
+    !n.includes("/apps/user-spa/") &&
     !n.includes("/packages/")
   );
 };

@@ -1,0 +1,37 @@
+{
+  "name": "@seekall/user-spa",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SeekAll User SPA - 用户中心(规则提交/license/订阅/账号设置/DMCA)",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc -b && vite build",
+    "preview": "vite preview",
+    "lint": "eslint src --ext .vue,.ts,.tsx --fix",
+    "format": "prettier --write \"src/**/*.{vue,ts,tsx,css}\"",
+    "clean": "rm -rf dist node_modules"
+  },
+  "dependencies": {
+    "@sentry/vue": "^9.0.0",
+    "axios": "^1.7.0",
+    "dayjs": "^1.11.0",
+    "pinia": "^2.1.0",
+    "vue": "^3.4.0",
+    "vue-router": "^4.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@unocss/preset-icons": "^0.58.0",
+    "@vitejs/plugin-vue": "^5.0.0",
+    "naive-ui": "^2.38.0",
+    "typescript": "^5.4.0",
+    "unocss": "^0.58.0",
+    "unplugin-auto-import": "^0.17.0",
+    "unplugin-vue-components": "^0.26.0",
+    "vfonts": "^0.0.3",
+    "vite": "^5.2.0",
+    "vue-tsc": "^2.0.0"
+  }
+}

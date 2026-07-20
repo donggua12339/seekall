@@ -287,6 +287,61 @@ importers:
         specifier: ^1.5.0
         version: 1.6.4(@algolia/client-search@5.56.0)(@types/node@20.19.43)(async-validator@4.2.5)(axios@1.18.1)(fuse.js@7.4.2)(postcss@8.5.17)(search-insights@2.17.3)(terser@5.49.0)(typescript@5.9.3)
 
+  apps/user-spa:
+    dependencies:
+      '@sentry/vue':
+        specifier: ^9.0.0
+        version: 9.47.1(pinia@2.3.1(typescript@5.9.3)(vue@3.5.39(typescript@5.9.3)))(vue@3.5.39(typescript@5.9.3))
+      axios:
+        specifier: ^1.7.0
+        version: 1.18.1
+      dayjs:
+        specifier: ^1.11.0
+        version: 1.11.21
+      pinia:
+        specifier: ^2.1.0
+        version: 2.3.1(typescript@5.9.3)(vue@3.5.39(typescript@5.9.3))
+      vue:
+        specifier: ^3.4.0
+        version: 3.5.39(typescript@5.9.3)
+      vue-router:
+        specifier: ^4.3.0
+        version: 4.6.4(vue@3.5.39(typescript@5.9.3))
+    devDependencies:
+      '@types/node':
+        specifier: ^20.11.0
+        version: 20.19.43
+      '@unocss/preset-icons':
+        specifier: ^0.58.0
+        version: 0.58.9
+      '@vitejs/plugin-vue':
+        specifier: ^5.0.0
+        version: 5.2.4(vite@5.4.21(@types/node@20.19.43)(terser@5.49.0))(vue@3.5.39(typescript@5.9.3))
+      naive-ui:
+        specifier: ^2.38.0
+        version: 2.44.1(vue@3.5.39(typescript@5.9.3))
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+      unocss:
+        specifier: ^0.58.0
+        version: 0.58.9(postcss@8.5.17)(rollup@4.62.2)(vite@5.4.21(@types/node@20.19.43)(terser@5.49.0))
+      unplugin-auto-import:
+        specifier: ^0.17.0
+        version: 0.17.8(@vueuse/core@12.8.2(typescript@5.9.3))(rollup@4.62.2)
+      unplugin-vue-components:
+        specifier: ^0.26.0
+        version: 0.26.0(@babel/parser@7.29.7)(rollup@4.62.2)(vue@3.5.39(typescript@5.9.3))
+      vfonts:
+        specifier: ^0.0.3
+        version: 0.0.3
+      vite:
+        specifier: ^5.2.0
+        version: 5.4.21(@types/node@20.19.43)(terser@5.49.0)
+      vue-tsc:
+        specifier: ^2.0.0
+        version: 2.2.12(typescript@5.9.3)
+
   packages/rule-arxiv:
     dependencies:
       '@seekall/sdk':
