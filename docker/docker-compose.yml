@@ -99,7 +99,7 @@ services:
     image: redis:7-alpine
     container_name: seekall-redis
     restart: unless-stopped
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    command: redis-server --appendonly yes --dir /data --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
       - ./redis/data:/data
     ports:

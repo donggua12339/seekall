@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 觅源 SeekAll - HK 服务器定时备份 cron wrapper
 # 安装：crontab -e，加一行：
-#   0 3 * * * /opt/seekall/scripts/backup-cron.sh >> /var/log/seekall/backup.log 2>&1
+#   0 3 * * * /opt/seekall-v0.5/scripts/backup-cron.sh >> /var/log/seekall/backup.log 2>&1
 #
 # 行为：每天 3 点执行
 #   1. MySQL dump (via docker exec seekall-mysql)
@@ -43,7 +43,7 @@ fi
 # ---------- 2. Redis ----------
 echo "  - Redis dump..."
 if docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^seekall-redis$'; then
-  docker exec seekall-redis redis-cli BGSAVE 2>/dev/null || true
+  docker exec -w / seekall-redis redis-cli BGSAVE 2>/dev/null || true
   sleep 2
   docker cp seekall-redis:/data/dump.rdb "${BACKUP_PATH}/redis.rdb" 2>/dev/null || \
     echo "    ! Redis dump copy 失败"
