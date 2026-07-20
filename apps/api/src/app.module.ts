@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common'
+import { APP_GUARD } from '@nestjs/core'
 import { ConfigModule } from '@nestjs/config'
 import { BullModule } from '@nestjs/bullmq'
 import { ScheduleModule } from '@nestjs/schedule'
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler'
 import { PrismaModule } from './database/prisma.module'
 import { RedisModule } from './database/redis.module'
 import { AuthModule } from './modules/auth/auth.module'
@@ -40,6 +42,14 @@ import { envValidation } from './config/env.validation'
 
     ScheduleModule.forRoot(),
 
+    // 限流（全局兜底 100 次/分钟/IP，敏感端点用 @Throttle 覆盖）
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60_000,
+        limit: 100,
+      },
+    ]),
+
     // 基础设施
     PrismaModule,
     RedisModule,
@@ -53,6 +63,10 @@ import { envValidation } from './config/env.validation'
     LicenseModule,
     DmcaModule,
     HealthModule,
+  ],
+  providers: [
+    // 全局限流 Guard（与 JwtAuthGuard 并列 APP_GUARD，ThrottlerGuard 先注册先执行）
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })
 export class AppModule {}

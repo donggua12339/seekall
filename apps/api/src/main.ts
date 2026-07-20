@@ -100,8 +100,11 @@ async function bootstrap() {
   app.useGlobalFilters(new HttpExceptionFilter())
   app.useGlobalInterceptors(new ResponseInterceptor())
 
-  // Swagger（仅 dev/staging）
-  if (configService.get<string>('SWAGGER_ENABLED', 'true') === 'true') {
+  // Swagger（仅 dev/staging，生产环境强制关闭）
+  if (
+    configService.get<string>('NODE_ENV') !== 'production' &&
+    configService.get<string>('SWAGGER_ENABLED', 'true') === 'true'
+  ) {
     const config = new DocumentBuilder()
       .setTitle('SeekAll API')
       .setDescription('觅源 SeekAll - 全网资源聚合搜索引擎 API 文档')

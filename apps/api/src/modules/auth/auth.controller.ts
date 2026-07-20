@@ -1,5 +1,6 @@
 import { Body, Controller, Post, HttpCode, HttpStatus } from '@nestjs/common'
 import { ApiTags, ApiOperation } from '@nestjs/swagger'
+import { Throttle } from '@nestjs/throttler'
 import { AuthService } from './auth.service'
 import { Public } from '../../common/decorators/public.decorator'
 import {
@@ -20,6 +21,7 @@ export class AuthController {
   @Post('register')
   @ApiOperation({ summary: '注册（v0.5 半公开，不强制邀请码）' })
   @HttpCode(HttpStatus.CREATED)
+  @Throttle({ default: { ttl: 60_000, limit: 3 } })
   register(@Body() dto: RegisterDto) {
     return this.authService.register(dto)
   }
@@ -28,6 +30,7 @@ export class AuthController {
   @Post('login')
   @ApiOperation({ summary: '登录' })
   @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto.username, dto.password)
   }
@@ -44,6 +47,7 @@ export class AuthController {
   @Post('password-reset/request')
   @ApiOperation({ summary: '申请密码重置' })
   @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { ttl: 60_000, limit: 3 } })
   requestPasswordReset(@Body() dto: RequestPasswordResetDto) {
     return this.authService.requestPasswordReset(dto.email)
   }
@@ -52,6 +56,7 @@ export class AuthController {
   @Post('password-reset/confirm')
   @ApiOperation({ summary: '确认密码重置' })
   @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { ttl: 60_000, limit: 3 } })
   resetPassword(@Body() dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto.token, dto.newPassword)
   }
