@@ -23,6 +23,7 @@ const menuOptions = computed<MenuOption[]>(() => [
   { label: 'DMCA 举报', key: 'dmca', icon: renderIcon('⚠️') },
   { label: '规则评审', key: 'rules', icon: renderIcon('📋') },
   { label: 'License 管理', key: 'licenses', icon: renderIcon('🔑') },
+  { label: '退款审核', key: 'refunds', icon: renderIcon('💰') },
   { label: '用户管理', key: 'users', icon: renderIcon('👤') },
   { label: '审计日志', key: 'audit-logs', icon: renderIcon('📜') },
 ])

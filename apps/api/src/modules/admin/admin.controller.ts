@@ -19,6 +19,16 @@ class AnalyticsDto {
   @IsInt() @Min(1) @Max(90) days: number = 7
 }
 
+class ListRefundsDto {
+  @IsInt() @Min(1) page: number = 1
+  @IsInt() @Min(1) @Max(100) pageSize: number = 20
+  @IsOptional() @IsString() status?: string
+}
+
+class ReviewRefundDto {
+  @IsOptional() @IsString() note?: string
+}
+
 class ReportDeadDto {
   @IsOptional() @IsString() note?: string
 }
@@ -71,9 +81,35 @@ export class AdminController {
   }
 
   @Get('transparency')
-  @ApiOperation({ summary: '透明度报告（上月 takedown 统计）' })
+  @ApiOperation({ summary: '透明度报告(上月 takedown 统计)' })
   transparency() {
     return this.service.transparencyReport()
+  }
+
+  @Get('refunds')
+  @ApiOperation({ summary: '退款申请列表' })
+  listRefunds(@Query() dto: ListRefundsDto) {
+    return this.service.listRefunds(dto.page, dto.pageSize, dto.status)
+  }
+
+  @Post('refunds/:id/approve')
+  @ApiOperation({ summary: '批准退款' })
+  approveRefund(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser('sub') adminId: string,
+    @Body() dto: ReviewRefundDto,
+  ) {
+    return this.service.reviewRefund(BigInt(id), 'approve', BigInt(adminId), dto.note)
+  }
+
+  @Post('refunds/:id/reject')
+  @ApiOperation({ summary: '拒绝退款' })
+  rejectRefund(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser('sub') adminId: string,
+    @Body() dto: ReviewRefundDto,
+  ) {
+    return this.service.reviewRefund(BigInt(id), 'reject', BigInt(adminId), dto.note)
   }
 }
 

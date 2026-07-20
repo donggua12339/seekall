@@ -50,6 +50,34 @@ export interface Analytics {
   }
 }
 
+export interface RefundRequest {
+  id: string
+  adminId: string
+  admin?: { id: string; username: string }
+  action: string
+  targetType: string
+  targetId?: string | null
+  detail: {
+    licenseCode?: string
+    tier?: string
+    reason?: string
+    userId?: string
+    status?: 'pending' | 'approved' | 'rejected'
+    reviewedBy?: string
+    reviewedAt?: string
+    adminNote?: string | null
+  }
+  createdAt: string
+}
+
+export interface RefundListRes {
+  list: RefundRequest[]
+  total: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
+
 export const adminApi = {
   dashboard: () => http.get<unknown, Dashboard>('/admin/dashboard'),
   analytics: (days: number = 7) =>
@@ -64,4 +92,10 @@ export const adminApi = {
       '/admin/audit-logs',
       { params },
     ),
+  listRefunds: (params: { page?: number; pageSize?: number; status?: string }) =>
+    http.get<unknown, RefundListRes>('/admin/refunds', { params }),
+  approveRefund: (id: string, note?: string) =>
+    http.post<unknown, RefundRequest>(`/admin/refunds/${id}/approve`, { note }),
+  rejectRefund: (id: string, note?: string) =>
+    http.post<unknown, RefundRequest>(`/admin/refunds/${id}/reject`, { note }),
 }

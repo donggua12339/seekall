@@ -1,8 +1,12 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { Injectable, NotFoundException, Logger } from '@nestjs/common'
 import { PrismaService } from '../../database/prisma.service'
+import { BusinessException } from '../../common/filters/http-exception.filter'
+import { ErrorCode } from '../../common/constants/error-codes'
 
 @Injectable()
 export class AdminService {
+  private readonly logger = new Logger(AdminService.name)
+
   constructor(private readonly prisma: PrismaService) {}
 
   async dashboard() {
@@ -99,6 +103,81 @@ export class AdminService {
       this.prisma.adminAuditLog.count(),
     ])
     return { list, total, page, pageSize, totalPages: Math.ceil(total / pageSize) }
+  }
+
+  /**
+   * 退款审核: 列出所有退款申请(action='refund_request')
+   */
+  async listRefunds(page: number, pageSize: number, status?: string) {
+    const where = {
+      action: 'refund_request' as const,
+      ...(status && status !== 'all' ? { detail: { path: ['status'], equals: status } } : {}),
+    }
+    const [list, total] = await Promise.all([
+      this.prisma.adminAuditLog.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        include: { admin: { select: { id: true, username: true } } },
+      }),
+      this.prisma.adminAuditLog.count({ where }),
+    ])
+    return { list, total, page, pageSize, totalPages: Math.ceil(total / pageSize) }
+  }
+
+  /**
+   * 退款审核: approve / reject
+   * 更新 audit log detail.status,记录审核 admin
+   */
+  async reviewRefund(logId: bigint, action: 'approve' | 'reject', adminId: bigint, note?: string) {
+    const log = await this.prisma.adminAuditLog.findUnique({ where: { id: logId } })
+    if (!log || log.action !== 'refund_request') {
+      throw new BusinessException(ErrorCode.NOT_FOUND, 404)
+    }
+
+    const detail = (log.detail as Record<string, unknown>) || {}
+    const newDetail = {
+      ...detail,
+      status: action === 'approve' ? 'approved' : 'rejected',
+      reviewedBy: adminId.toString(),
+      reviewedAt: new Date().toISOString(),
+      adminNote: note || null,
+    }
+
+    const updated = await this.prisma.adminAuditLog.update({
+      where: { id: logId },
+      data: { detail: newDetail },
+    })
+
+    // 如果 approve,把 license status 改为 disabled(标记已退款)
+    if (action === 'approve') {
+      const licenseCode = (detail as { licenseCode?: string })?.licenseCode
+      if (licenseCode) {
+        await this.prisma.license.updateMany({
+          where: { code: licenseCode },
+          data: { status: 'disabled' },
+        })
+      }
+    }
+
+    // 记录审核操作到 audit log
+    await this.prisma.adminAuditLog.create({
+      data: {
+        adminId,
+        action: action === 'approve' ? 'refund_approved' : 'refund_rejected',
+        targetType: 'license',
+        targetId: log.targetId,
+        detail: {
+          refundRequestLogId: logId.toString(),
+          licenseCode: (detail as { licenseCode?: string })?.licenseCode,
+          note: note || null,
+        },
+      },
+    })
+
+    this.logger.log(`Refund ${action}d: log=${logId} admin=${adminId}`)
+    return updated
   }
 
   /**
