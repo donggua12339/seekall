@@ -1,6 +1,5 @@
 import { NestFactory } from '@nestjs/core'
 import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify'
-import type { FastifyReply, FastifyRequest } from 'fastify'
 import { ValidationPipe, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
@@ -131,7 +130,7 @@ async function bootstrap() {
     const document = SwaggerModule.createDocument(app, config)
     // 只挂载 /docs-json(Fastify raw route),不挂载 /docs(Swagger UI)
     const fastifyInstance = app.getHttpAdapter().getInstance()
-    fastifyInstance.get('/api/v1/docs-json', async (_req: FastifyRequest, reply: FastifyReply) => {
+    fastifyInstance.get('/api/v1/docs-json', async (_req, reply) => {
       reply.header('Content-Type', 'application/json')
       reply.header('Access-Control-Allow-Origin', 'https://seekall.winmelon.cn')
       return reply.send(document)
