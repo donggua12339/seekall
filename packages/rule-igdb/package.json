@@ -1,0 +1,19 @@
+{
+  "name": "@seekall/rule-igdb",
+  "version": "0.5.0",
+  "description": "SeekAll L2 付费独享规则 - IGDB 游戏搜索",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsup", "dev": "tsup --watch", "clean": "rm -rf dist", "typecheck": "tsc --noEmit"
+  },
+  "dependencies": { "@seekall/sdk": "workspace:*" },
+  "devDependencies": { "tsup": "^8.0.0", "typescript": "^5.4.0", "@types/node": "^20.11.0" },
+  "engines": { "node": ">=20.0.0" },
+  "publishConfig": { "access": "public" }
+}
