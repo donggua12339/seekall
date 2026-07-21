@@ -15,11 +15,14 @@ import {
 } from 'naive-ui'
 import { adminApi, type Dashboard, type AuditLog } from '@/api/admin'
 import { dmcaApi, type TransparencyReport } from '@/api/dmca'
+import { getBulkWeeklyDownloads, SEEKALL_PACKAGES } from '@/api/npm'
 
 const loading = ref(true)
 const dashboard = ref<Dashboard | null>(null)
 const transparency = ref<TransparencyReport | null>(null)
 const recentLogs = ref<AuditLog[]>([])
+const npmDownloads = ref<Record<string, number>>({})
+const totalNpmDownloads = ref(0)
 
 async function loadDashboard() {
   loading.value = true
@@ -32,6 +35,16 @@ async function loadDashboard() {
     dashboard.value = d
     transparency.value = t
     recentLogs.value = logs.list
+
+    // npm 下载量(不阻塞 Dashboard 加载)
+    getBulkWeeklyDownloads(SEEKALL_PACKAGES)
+      .then((stats) => {
+        npmDownloads.value = stats
+        totalNpmDownloads.value = Object.values(stats).reduce((a, b) => a + b, 0)
+      })
+      .catch(() => {
+        // npm API 失败静默(不影响 Dashboard)
+      })
   } catch (err) {
     console.error(err)
   } finally {
@@ -83,6 +96,40 @@ onMounted(loadDashboard)
         </NCard>
       </NGridItem>
     </NGrid>
+
+    <NCard title="npm 下载量(上周)" style="margin-top: 16px;">
+      <NGrid :cols="4" :x-gap="16" :y-gap="16">
+        <NGridItem>
+          <NStatistic label="总下载量" :value="totalNpmDownloads" />
+        </NGridItem>
+        <NGridItem>
+          <NStatistic
+            label="@seekall/sdk"
+            :value="npmDownloads['@seekall/sdk'] ?? 0"
+          />
+        </NGridItem>
+        <NGridItem>
+          <NStatistic
+            label="L0 规则(arxiv+crossref+pubmed)"
+            :value="
+              (npmDownloads['@seekall/rule-arxiv'] ?? 0) +
+              (npmDownloads['@seekall/rule-crossref'] ?? 0) +
+              (npmDownloads['@seekall/rule-pubmed'] ?? 0)
+            "
+          />
+        </NGridItem>
+        <NGridItem>
+          <NStatistic
+            label="L2 付费规则(11 个)"
+            :value="
+              Object.entries(npmDownloads)
+                .filter(([k]) => !k.endsWith('sdk') && !k.includes('arxiv') && !k.includes('crossref') && !k.includes('pubmed') && !k.includes('github') && !k.includes('hackernews'))
+                .reduce((a, [, v]) => a + v, 0)
+            "
+          />
+        </NGridItem>
+      </NGrid>
+    </NCard>
 
     <NCard title="透明度报告" style="margin-top: 16px;">
       <NGrid :cols="5" :x-gap="16" :y-gap="16">

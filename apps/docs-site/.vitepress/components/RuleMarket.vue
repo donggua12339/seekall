@@ -16,6 +16,7 @@ const error = ref('')
 const rules = ref<MarketRule[]>([])
 const searchQuery = ref('')
 const selectedRisk = ref<number | 'all'>('all')
+const downloads = ref<Record<string, number>>({})
 
 const riskLevels = [
   { value: 'all', label: '全部', color: '#666' },
@@ -48,6 +49,8 @@ async function loadRules() {
     const body = await res.json()
     if (body.code === 0) {
       rules.value = body.data || []
+      // 加载完规则后,批量拉 npm 下载量(不阻塞渲染)
+      loadDownloads()
     } else {
       error.value = body.message || '加载失败'
     }
@@ -55,6 +58,27 @@ async function loadRules() {
     error.value = err instanceof Error ? err.message : '网络错误'
   } finally {
     loading.value = false
+  }
+}
+
+async function loadDownloads() {
+  try {
+    const packages = rules.value.map((r) => r.npmPackage).filter(Boolean)
+    if (packages.length === 0) return
+    // npm bulk API 最多 128 个包,逗号分隔
+    const url = `https://api.npmjs.org/downloads/point/last-week/${packages
+      .map(encodeURIComponent)
+      .join(',')}`
+    const res = await fetch(url)
+    if (!res.ok) return
+    const data = (await res.json()) as Record<string, { downloads: number }>
+    const map: Record<string, number> = {}
+    for (const [pkg, info] of Object.entries(data)) {
+      map[pkg] = info.downloads
+    }
+    downloads.value = map
+  } catch {
+    // npm API 失败静默(不显示下载量)
   }
 }
 
@@ -120,6 +144,9 @@ onMounted(loadRules)
         <p class="description">{{ rule.description }}</p>
         <div class="rule-footer">
           <span v-if="rule.author" class="author">@{{ rule.author.username }}</span>
+          <span v-if="downloads[rule.npmPackage]" class="downloads">
+            ⬇ {{ downloads[rule.npmPackage] }}/周
+          </span>
           <button class="install-btn" @click="copyInstall(rule.npmPackage)">
             复制安装命令
           </button>
@@ -265,6 +292,12 @@ onMounted(loadRules)
 .author {
   font-size: 12px;
   color: var(--vp-text-color-light, #999);
+}
+
+.downloads {
+  font-size: 12px;
+  color: #3aa675;
+  font-weight: 600;
 }
 
 .install-btn {

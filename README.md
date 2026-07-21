@@ -1,16 +1,36 @@
-# SeekAll — 网盘 / 磁力聚合搜索的规则引擎
+# SeekAll - 规则引擎 SDK + 市场
 
-> 中立的搜索规则 SDK + 市场。规则在你机器上跑，服务端零接触资源。
+> 中立的搜索规则 SDK + 市场。规则在你机器上跑,服务端零接触资源。
 
+[![npm version](https://img.shields.io/npm/v/@seekall/sdk.svg)](https://www.npmjs.com/package/@seekall/sdk)
+[![npm downloads](https://img.shields.io/npm/dw/@seekall/sdk.svg)](https://www.npmjs.com/package/@seekall/sdk)
 [![License: AGPL-3.0](https://img.shields.io/badge/SDK-AGPL--3.0-blue.svg)](LICENSE)
-[![License: MIT](https://img.shields.io/badge/Plugins-MIT-green.svg)](LICENSE.plugins)
 [![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](#)
+[![GitHub stars](https://img.shields.io/github/stars/donggua12339/seekall?style=social)](https://github.com/donggua12339/seekall)
+
+**如果觉得有用,给个 ⭐ Star 支持一下!**
+
+## 快速开始
+
+```bash
+# 一行命令搜索(默认带 3 个 L0 学术规则: arxiv + crossref + pubmed)
+npx @seekall/sdk search transformer
+```
+
+```bash
+# 安装到项目
+npm i @seekall/sdk
+
+# 初始化新项目(脚手架)
+npx @seekall/sdk init my-app
+```
 
 ## 它是什么
 
-- 一个 npm 包：`npm i @seekall/sdk`
-- 一个规则市场：[rules.seekall.winmelon.cn](https://rules.seekall.winmelon.cn)
-- 一个 BaaS：账号、规则订阅、付费授权
+- 一个 npm 包: `npm i @seekall/sdk`
+- 一个规则市场: [seekall.winmelon.cn/rules](https://seekall.winmelon.cn/rules/)
+- 一个 BaaS: 账号、规则订阅、付费授权
+- 一个用户中心: [user.seekall.winmelon.cn](https://user.seekall.winmelon.cn)
 
 ## 它不是
 
@@ -32,72 +52,70 @@ const engine = createEngine({ rules: [arxiv] });
 const hits = await engine.search("transformer");
 ```
 
-SDK 在你机器上跑所有规则 → 汇总去重 → 返回结果给你。
+SDK 在你机器上跑所有规则 -> 汇总去重 -> 返回结果给你。
 服务端只负责账号、规则市场列表、DMCA 邮箱。
 
-## 风险评级（5 级）
+## CLI 命令
 
-| 级别 | 含义                                  | 可见性               |
-| ---- | ------------------------------------- | -------------------- |
-| L0   | 学术纯净（arxiv / crossref / pubmed） | 所有人               |
-| L1   | 官方 API                              | 所有人               |
-| L2   | 混搜警告（聚合型资源站）              | 会员可见             |
-| L3   | 高风险（论坛 / 网盘类）               | admin 可见，仅作审计 |
-| L4   | 严重侵权源                            | admin 可见，仅作审计 |
+```bash
+seekall search <keyword>           # 搜索(默认 3 个 L0 规则)
+seekall license redeem <code>      # 激活 license
+seekall sync                       # 同步云端订阅 + 配置
+seekall rules list                 # 列出可用规则
+seekall rules install <pkg>        # 安装规则包
+seekall config set license <code>  # 配置 license
+seekall whoami                     # 查看 license 信息
+seekall init [name]                # 初始化项目
+```
 
-5 维权限矩阵（View / Run / Save / Upload / Author）严格映射会员档，详见 [文档](apps/docs-site/guide/permission-matrix.md)。
+## 风险评级(5 级)
 
-## 会员（不强制）
+| 级别 | 含义                                   | 可见性   |
+| ---- | -------------------------------------- | -------- |
+| L0   | 学术纯净(arxiv / crossref / pubmed)    | 所有人   |
+| L1   | 通用开源(GitHub / Hacker News)         | 所有人   |
+| L2   | 付费独享(开发者热点 / 文娱 / 学术增强) | 付费会员 |
+| L3   | 高风险                                 | 仅 admin |
+| L4   | 严重侵权源                             | 仅 admin |
 
-| 档位 | 价格 | 时长  | 权限                          |
-| ---- | ---- | ----- | ----------------------------- |
-| 免费 | ¥0   | 永久  | L0-L1 规则                    |
-| 试用 | ¥1   | 7 天  | L0-L2 规则（每账号限购 1 次） |
-| 月卡 | ¥18  | 30 天 | L0-L2 + 上传规则（5 条/月）   |
-| 永久 | ¥68  | 永久  | L0-L3 + 上传规则 + 作者徽章   |
+## 会员(不强制)
 
-主推永久。¥1 试用每月可发 3 个邀请码（防羊毛）。
+| 档位     | 价格 | 时长   | 权限                    |
+| -------- | ---- | ------ | ----------------------- |
+| trial    | ¥1   | 7 天   | L0-L1 订阅              |
+| monthly  | ¥18  | 30 天  | L0-L2 + 评审权 + 邀请码 |
+| lifetime | ¥68  | 100 年 | 同 monthly              |
 
-## 协议
+购买: [WM 发卡网](https://winmelon.cn) -> 兑换码 -> `seekall license redeem <code>`
 
-- SDK 核心：AGPL-3.0（强 copyleft）
-- 插件：MIT（宽松，鼓励社区贡献）
-- 服务端 BaaS：BUSL（商业源码许可）
+## 可用规则(18 个 npm 包)
 
-## 合规
+**L0 学术(免费)**: arxiv / crossref / pubmed
 
-- 站点零接触盗版源（规则在你机器跑）
-- L3/L4 规则仅 admin 可见，仅作审计
-- DMCA 邮箱：`1660069758@qq.com`（24h 内人工响应）
-- Takedown 透明度报告每月发布
+**L1 通用(免费)**: github / hackernews
+
+**L2 付费独享(11 个)**:
+
+- 开发者热点: reddit / producthunt / github-trending / hackernews-trending
+- 文娱: tmdb / omdb / lastfm / igdb
+- 学术增强: arxiv-trending / openalex / semantic-scholar
+
+浏览全部: [规则市场](https://seekall.winmelon.cn/rules/)
 
 ## 文档
 
-完整文档在 [apps/docs-site/](apps/docs-site/)（vitepress 静态站）：
+- **指南**: [seekall.winmelon.cn/guide/](https://seekall.winmelon.cn/guide/getting-started)
+- **SDK 文档**: [seekall.winmelon.cn/sdk/](https://seekall.winmelon.cn/sdk/)
+- **API 文档**: [seekall.winmelon.cn/api/](https://seekall.winmelon.cn/api/)
+- **合规**: [seekall.winmelon.cn/compliance/](https://seekall.winmelon.cn/compliance/)
 
-- [快速开始](apps/docs-site/guide/getting-started.md)
-- [它是什么](apps/docs-site/guide/what-is-seekall.md)
-- [5 级风险评级](apps/docs-site/guide/risk-levels.md)
-- [5 维权限矩阵](apps/docs-site/guide/permission-matrix.md)
-- [SDK 接口](apps/docs-site/sdk/rule-interface.md)
-- [合规框架](apps/docs-site/compliance/index.md)
+## 贡献
 
-## 开发
-
-```bash
-pnpm install
-pnpm dev          # 启动 API + docs-site
-pnpm build       # 构建
-pnpm test        # 测试
-pnpm lint         # 代码检查
-```
-
-## 项目状态
-
-v0.5 重构中（Sprint 4 周，详见交接手册）。
-v0.4.1 已归档为 `v0.4.1-archive` git tag。
+- 写规则: [规则作者指南](https://seekall.winmelon.cn/rules/author-guide)
+- 提交规则: `seekall rules submit` 或 [用户中心](https://user.seekall.winmelon.cn)
+- 反馈: [GitHub Discussions](https://github.com/donggua12339/seekall/discussions)
 
 ## License
 
-- SDK 核心：[AGPL-3.0](LICENSE)
-- 插件：MIT（见各插件包内 LICENSE）
+- SDK 核心: AGPL-3.0
+- 规则插件: MIT

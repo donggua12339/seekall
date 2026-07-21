@@ -100,8 +100,33 @@ const tierLabel = (tier?: string | null) => {
         <NButton @click="$router.push('/subscriptions')">
           我的订阅
         </NButton>
+        <NButton
+          v-if="userInfo?.isPaid"
+          type="warning"
+          @click="$router.push('/licenses')"
+        >
+          邀请好友(赚 ¥1 试用码)
+        </NButton>
         <NButton @click="$router.push('/dmca')">
           DMCA 举报
+        </NButton>
+      </NSpace>
+    </NCard>
+
+    <NCard
+      v-if="userInfo?.isPaid"
+      title="邀请好友"
+      style="margin-top: 16px;"
+    >
+      <NSpace vertical>
+        <NText>
+          月度/终身会员每月可生成 3 个 ¥1 试用邀请码,分享给朋友体验 SeekAll。
+        </NText>
+        <NText depth="3">
+          朋友用邀请码激活后,可获得 7 天试用会员(L0-L1 规则订阅权限)。
+        </NText>
+        <NButton type="primary" @click="$router.push('/licenses')">
+          生成邀请码
         </NButton>
       </NSpace>
     </NCard>
