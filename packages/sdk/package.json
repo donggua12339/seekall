@@ -1,6 +1,6 @@
 {
   "name": "@seekall/sdk",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "SeekAll 规则引擎 SDK - 中立的搜索规则 + 市场",
   "license": "AGPL-3.0-only",
   "type": "module",
