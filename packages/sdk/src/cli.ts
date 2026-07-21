@@ -255,6 +255,83 @@ program
     }
   })
 
+// ============ seekall rules install <pkg> ============
+const rulesCmd = program.commands.find((c) => c.name() === 'rules')!
+
+rulesCmd
+  .command('install')
+  .description('安装规则包(npm install + 加入默认规则)')
+  .argument('<npm-package>', 'npm 包名(如 @seekall/rule-github)')
+  .option('-g, --global', '全局安装(默认当前项目)')
+  .action(async (npmPackage: string, opts: { global?: boolean }) => {
+    console.log(chalk.cyan(`📦 安装规则 ${npmPackage}...`))
+
+    // npm install
+    const { spawn } = await import('child_process')
+    const npmArgs = ['install', npmPackage]
+    if (opts.global) npmArgs.push('-g')
+
+    const exitCode = await new Promise<number>((resolve) => {
+      const proc = spawn('npm', npmArgs, { stdio: 'inherit', shell: true })
+      proc.on('close', resolve)
+    })
+
+    if (exitCode !== 0) {
+      console.log(chalk.red(`  ❌ npm install 失败 (exit ${exitCode})`))
+      process.exit(1)
+    }
+
+    // 加入 defaultRules(去重)
+    const config = resolveConfig()
+    if (!config.defaultRules.includes(npmPackage)) {
+      const newRules = [...config.defaultRules, npmPackage]
+      setConfigValue('defaultRules', newRules)
+      console.log(chalk.green(`  ✅ 已加入默认规则(${newRules.length} 个)`))
+    } else {
+      console.log(chalk.gray(`  规则已在默认列表中,跳过`))
+    }
+
+    console.log()
+    console.log(chalk.yellow('  下一步:'))
+    console.log(chalk.gray(`  seekall search "your keyword"  # 现在包含 ${npmPackage}`))
+  })
+
+rulesCmd
+  .command('uninstall')
+  .description('卸载规则包(npm uninstall + 从默认规则移除)')
+  .argument('<npm-package>', 'npm 包名')
+  .option('-g, --global', '全局卸载')
+  .action(async (npmPackage: string, opts: { global?: boolean }) => {
+    console.log(chalk.cyan(`📦 卸载规则 ${npmPackage}...`))
+
+    // 从 defaultRules 移除
+    const config = resolveConfig()
+    if (config.defaultRules.includes(npmPackage)) {
+      const newRules = config.defaultRules.filter((r) => r !== npmPackage)
+      setConfigValue('defaultRules', newRules)
+      console.log(chalk.green(`  ✅ 已从默认规则移除(${newRules.length} 个剩余)`))
+    } else {
+      console.log(chalk.gray(`  规则不在默认列表中`))
+    }
+
+    // npm uninstall
+    const { spawn } = await import('child_process')
+    const npmArgs = ['uninstall', npmPackage]
+    if (opts.global) npmArgs.push('-g')
+
+    const exitCode = await new Promise<number>((resolve) => {
+      const proc = spawn('npm', npmArgs, { stdio: 'inherit', shell: true })
+      proc.on('close', resolve)
+    })
+
+    if (exitCode !== 0) {
+      console.log(chalk.yellow(`  ⚠️  npm uninstall 返回 ${exitCode}(可能未安装)`)
+      )
+    } else {
+      console.log(chalk.green(`  ✅ npm uninstall 完成`))
+    }
+  })
+
 // ============ seekall config ============
 const configCmd = program.command('config').description('配置管理')
 

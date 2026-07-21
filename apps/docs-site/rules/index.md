@@ -15,16 +15,23 @@
 - 不替用户跑规则（规则在用户机器跑）
 - 不向 L3/L4 规则的资源站发 outbound 请求
 
-## 列表页
+## 交互式市场
 
-```
-规则市场
-├── 风险级别筛选：[L0] [L1] [L2] [L3 admin] [L4 admin]
-├── 搜索框
-└── 规则列表
-    ├── @seekall/rule-arxiv (L0) by @donggua
-    ├── @seekall/rule-crossref (L0) by @donggua
-    └── @someone/my-rule (L1) by @someone [审核中]
+下方实时拉取市场规则，支持搜索 + 风险等级筛选：
+
+<RuleMarket />
+
+## CLI 快速安装
+
+```bash
+# 列出所有可用规则
+npx @seekall/sdk rules list
+
+# 安装规则(npm install + 加入默认规则)
+npx @seekall/sdk rules install @seekall/rule-github
+
+# 卸载规则
+npx @seekall/sdk rules uninstall @seekall/rule-github
 ```
 
 ## 订阅
@@ -36,5 +43,6 @@ SDK 启动时拉取订阅列表，自动加载。
 
 1. 写一个 npm 包，实现 Rule 接口
 2. 发布到 npmjs.com
-3. 在市场页提交：填包名 + 风险级别 + 描述
+3. 在用户中心提交：填包名 + 风险级别 + 描述
 4. 等待审核（L0/L1 admin 抽查，L2 社群评审）
+
