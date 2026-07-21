@@ -145,6 +145,12 @@ export class AdminRuleController {
     })
   }
 
+  @Get(':id/reviews')
+  @ApiOperation({ summary: 'Admin 查看规则评审详情(投票 + 评论)' })
+  listReviews(@Param('id', ParseIntPipe) id: number) {
+    return this.service.listReviews(BigInt(id))
+  }
+
   @Post(':id/takedown')
   @ApiOperation({ summary: 'DMCA Takedown 规则（累计 3 次封禁作者）' })
   takedown(

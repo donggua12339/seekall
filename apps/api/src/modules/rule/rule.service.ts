@@ -29,6 +29,49 @@ export class RuleService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
+   * 校验用户会员档位是否满足订阅/评审 L2 规则的要求
+   *
+   * 规则(见 CLAUDE.md 会员档位表):
+   *   - trial(¥1): 只能 L0-L1
+   *   - monthly(¥18) / lifetime(¥68): 可 L0-L2
+   *   - free / 过期: 不能 L2
+   *
+   * @param minTier 最低要求的 tier('monthly' | 'lifetime')
+   * @throws ForbiddenException 如果不满足
+   */
+  private async validateUserTier(userId: bigint, minTier: 'monthly' | 'lifetime'): Promise<void> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { isPaid: true, tier: true, paidUntil: true, status: true },
+    })
+    if (!user || user.status === 'banned' || user.status === 'deleted') {
+      throw new ForbiddenException('账号不可用')
+    }
+
+    // isPaid 为 false 直接拒
+    if (!user.isPaid) {
+      throw new ForbiddenException(
+        minTier === 'monthly' ? '该操作需付费会员(月度 ¥18 起)' : '该操作需终身会员',
+      )
+    }
+
+    // 校验 paidUntil 未过期(isPaid 可能是缓存值,paidUntil 才是真实到期)
+    if (user.paidUntil && user.paidUntil < new Date()) {
+      throw new ForbiddenException('会员已过期,请续费')
+    }
+
+    // 校验 tier 等级
+    const TIER_RANK: Record<string, number> = { trial: 1, monthly: 2, lifetime: 3 }
+    const userRank = user.tier ? TIER_RANK[user.tier] || 0 : 0
+    const requiredRank = TIER_RANK[minTier]
+    if (userRank < requiredRank) {
+      throw new ForbiddenException(
+        `该操作需 ${minTier === 'monthly' ? '月度(¥18)' : '终身(¥68)'} 会员,当前档位: ${user.tier || 'free'}`,
+      )
+    }
+  }
+
+  /**
    * 列出规则市场所有规则
    * - L0/L1: 所有人可见
    * - L2: 会员可见
@@ -148,14 +191,8 @@ export class RuleService {
       throw new ForbiddenException('不能评审自己提交的规则')
     }
 
-    // 评审员需付费会员
-    const reviewer = await this.prisma.user.findUnique({
-      where: { id: input.reviewerId },
-      select: { isPaid: true },
-    })
-    if (!reviewer?.isPaid) {
-      throw new ForbiddenException('评审需 ¥18 月卡及以上会员')
-    }
+    // 评审员需 monthly 及以上会员(trial 不能评审,见 CLAUDE.md)
+    await this.validateUserTier(input.reviewerId, 'monthly')
 
     // upsert 评审（一人一票，再次评审更新 approve/comment）
     await this.prisma.ruleReview.upsert({
@@ -223,7 +260,51 @@ export class RuleService {
   }
 
   /**
-   * Takedown 规则（收到 DMCA 后 admin 操作）
+   * 列出某规则的所有评审(admin 查看评审详情)
+   */
+  async listReviews(ruleId: bigint) {
+    const rule = await this.prisma.rule.findUnique({ where: { id: ruleId } })
+    if (!rule) throw new NotFoundException('Rule not found')
+
+    const [reviews, approvals, rejections] = await Promise.all([
+      this.prisma.ruleReview.findMany({
+        where: { ruleId },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          reviewer: {
+            select: { id: true, username: true },
+          },
+        },
+      }),
+      this.prisma.ruleReview.count({ where: { ruleId, approve: true } }),
+      this.prisma.ruleReview.count({ where: { ruleId, approve: false } }),
+    ])
+
+    return {
+      ruleId: ruleId.toString(),
+      npmPackage: rule.npmPackage,
+      riskLevel: rule.riskLevel,
+      status: rule.status,
+      summary: {
+        total: approvals + rejections,
+        approvals,
+        rejections,
+        threshold: 3,
+        readyForFinalReview: approvals >= 3,
+      },
+      reviews: reviews.map((r) => ({
+        id: r.id.toString(),
+        reviewerId: r.reviewerId.toString(),
+        reviewerUsername: r.reviewer.username,
+        approve: r.approve,
+        comment: r.comment,
+        createdAt: r.createdAt.toISOString(),
+      })),
+    }
+  }
+
+  /**
+   * Takedown 规则(收到 DMCA 后 admin 操作)
    * 累计 3 次 takedown -> 作者永久封禁，所有规则下架
    */
   async takedown(input: { ruleId: bigint; adminId: bigint; reason: string }) {
@@ -280,7 +361,7 @@ export class RuleService {
     const rule = await this.prisma.rule.findUnique({ where: { id: ruleId } })
     if (!rule) throw new NotFoundException('Rule not found')
     if (rule.status !== RuleStatus.published) {
-      throw new BadRequestException('规则未发布，无法订阅')
+      throw new BadRequestException('规则未发布,无法订阅')
     }
 
     // L3/L4 永远不可订阅
@@ -288,18 +369,12 @@ export class RuleService {
       throw new ForbiddenException('L3/L4 规则不可订阅')
     }
 
-    // L2 需付费
+    // L2 需 monthly 及以上会员(trial 不行,见 CLAUDE.md 会员档位表)
     if (rule.riskLevel === RuleRiskLevel.l2) {
-      const user = await this.prisma.user.findUnique({
-        where: { id: userId },
-        select: { isPaid: true },
-      })
-      if (!user?.isPaid) {
-        throw new ForbiddenException('L2 规则需付费会员')
-      }
+      await this.validateUserTier(userId, 'monthly')
     }
 
-    // upsert 幂等：已订阅则不动，未订阅则创建
+    // upsert 幂等:已订阅则不动,未订阅则创建
     await this.prisma.ruleSubscription.upsert({
       where: {
         userId_ruleId: { userId, ruleId },

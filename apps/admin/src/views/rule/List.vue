@@ -3,9 +3,10 @@ import { ref, reactive, onMounted, h } from 'vue'
 import { useMessage, useDialog } from 'naive-ui'
 import {
   NCard, NDataTable, NButton, NSpace, NTag, NSelect, NPagination, NSpin, NEmpty,
-  NModal, NForm, NFormItem, NInput, type DataTableColumns,
+  NModal, NForm, NFormItem, NInput, NStatistic, NGrid, NGridItem, NList, NListItem, NThing, NTime,
+  type DataTableColumns,
 } from 'naive-ui'
-import { ruleApi, type Rule } from '@/api/rule'
+import { ruleApi, type Rule, type RuleReviewSummary } from '@/api/rule'
 
 const message = useMessage()
 const dialog = useDialog()
@@ -88,9 +89,14 @@ const columns: DataTableColumns<Rule> = [
   {
     title: '操作',
     key: 'actions',
-    width: 280,
+    width: 340,
     render: (row) =>
       h(NSpace, { size: 'small' }, () => [
+        h(
+          NButton,
+          { size: 'small', type: 'info', onClick: () => handleViewReviews(row) },
+          () => '评审',
+        ),
         row.status === 'pending_review' &&
           h(
             NButton,
@@ -157,6 +163,25 @@ async function submitTakedown() {
     await loadList()
   } catch (err) {
     message.error((err as Error).message)
+  }
+}
+
+// Reviews Modal
+const showReviews = ref(false)
+const reviewsLoading = ref(false)
+const reviewSummary = ref<RuleReviewSummary | null>(null)
+
+async function handleViewReviews(row: Rule) {
+  showReviews.value = true
+  reviewsLoading.value = true
+  reviewSummary.value = null
+  try {
+    reviewSummary.value = await ruleApi.listReviews(row.id)
+  } catch (err) {
+    message.error((err as Error).message)
+    showReviews.value = false
+  } finally {
+    reviewsLoading.value = false
   }
 }
 
@@ -249,6 +274,75 @@ onMounted(loadList)
           <NButton type="error" @click="submitTakedown">确认下架</NButton>
         </NSpace>
       </NForm>
+    </NModal>
+
+    <NModal
+      v-model:show="showReviews"
+      preset="card"
+      title="规则评审详情"
+      style="width: 640px;"
+    >
+      <NSpin :show="reviewsLoading">
+        <template v-if="reviewSummary">
+          <NCard size="small" :bordered="false">
+            <NGrid :cols="4" :x-gap="12" :y-gap="12">
+              <NGridItem>
+                <NStatistic label="总票数" :value="reviewSummary.summary.total" />
+              </NGridItem>
+              <NGridItem>
+                <NStatistic label="赞同" :value="reviewSummary.summary.approvals">
+                  <template #suffix>
+                    <NTag size="small" type="success" round>approve</NTag>
+                  </template>
+                </NStatistic>
+              </NGridItem>
+              <NGridItem>
+                <NStatistic label="反对" :value="reviewSummary.summary.rejections">
+                  <template #suffix>
+                    <NTag size="small" type="error" round>reject</NTag>
+                  </template>
+                </NStatistic>
+              </NGridItem>
+              <NGridItem>
+                <NStatistic
+                  label="阈值"
+                  :value="`${reviewSummary.summary.approvals}/${reviewSummary.summary.threshold}`"
+                />
+              </NGridItem>
+            </NGrid>
+            <NTag
+              :type="reviewSummary.summary.readyForFinalReview ? 'success' : 'warning'"
+              size="small"
+              round
+              style="margin-top: 12px;"
+            >
+              {{ reviewSummary.summary.readyForFinalReview ? '已达终审阈值' : '未达终审阈值' }}
+            </NTag>
+          </NCard>
+
+          <NCard title="评审列表" size="small" style="margin-top: 12px;" :bordered="false">
+            <NList v-if="reviewSummary.reviews.length > 0" bordered>
+              <NListItem v-for="r in reviewSummary.reviews" :key="r.id">
+                <NThing>
+                  <template #header>
+                    <NTag :type="r.approve ? 'success' : 'error'" size="small" round>
+                      {{ r.approve ? '赞同' : '反对' }}
+                    </NTag>
+                    <span style="margin-left: 8px;">{{ r.reviewerUsername }}</span>
+                  </template>
+                  <template #description>
+                    <NTime :time="new Date(r.createdAt)" type="datetime" />
+                    <span v-if="r.comment" style="margin-left: 8px; color: #666;">
+                      {{ r.comment }}
+                    </span>
+                  </template>
+                </NThing>
+              </NListItem>
+            </NList>
+            <NEmpty v-else description="暂无评审" />
+          </NCard>
+        </template>
+      </NSpin>
     </NModal>
   </NCard>
 </template>
