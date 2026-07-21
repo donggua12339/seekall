@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable, Logger, ForbiddenException } from '@nestjs/common'
 import { PrismaService } from '../../database/prisma.service'
 import { BusinessException } from '../../common/filters/http-exception.filter'
 import { ErrorCode } from '../../common/constants/error-codes'
@@ -158,7 +158,7 @@ export class UserService {
     const usedAt = license.usedAt || license.createdAt
     const daysSinceUsed = (Date.now() - usedAt.getTime()) / (1000 * 60 * 60 * 24)
     if (daysSinceUsed > 7) {
-      throw new BusinessException(ErrorCode.PARAM_ERROR, 400)
+      throw new ForbiddenException('超过 7 天不可退款')
     }
 
     // 记录到 adminAuditLog,action='refund_request',等待 admin 审核

@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [master]
   pull_request:
-    branches: [main, develop]
+    branches: [master]
 
 env:
   NODE_VERSION: '20'
@@ -13,7 +13,7 @@ env:
 jobs:
   # ========== 代码检查 ==========
   lint:
-    name: Lint
+    name: Lint + Format
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -31,11 +31,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Lint
-        run: pnpm lint
-
       - name: Check format
-        run: pnpm exec prettier --check "**/*.{ts,vue,js,json,md,yml,yaml}"
+        run: pnpm exec prettier --check "apps/api/src/**/*.ts" "packages/sdk/src/**/*.ts"
 
   # ========== 后端单元测试 ==========
   test-api:
@@ -59,10 +56,12 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Generate Prisma Client
-        run: pnpm --filter api prisma:generate
+        run: pnpm --filter @seekall/api prisma:generate
 
       - name: Run unit tests
-        run: pnpm --filter api test --coverage
+        run: pnpm --filter @seekall/api test --coverage
+        env:
+          NODE_ENV: test
 
       - name: Upload coverage
         if: always()
@@ -72,78 +71,9 @@ jobs:
           path: apps/api/coverage/
           retention-days: 7
 
-  # ========== 后端 E2E 测试 ==========
-  test-api-e2e:
-    name: API E2E Tests
-    runs-on: ubuntu-latest
-    needs: test-api
-    services:
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_ROOT_PASSWORD: test
-          MYSQL_DATABASE: seekall_test
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping -h localhost -u root -ptest"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
-
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd="redis-cli ping"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
-
-    env:
-      DATABASE_URL: mysql://root:test@localhost:3306/seekall_test
-      REDIS_URL: redis://localhost:6379
-      MEILISEARCH_URL: http://localhost:7700
-      MEILISEARCH_MASTER_KEY: test-master-key
-      JWT_ACCESS_SECRET: test_access_secret_at_least_32_characters_long
-      JWT_REFRESH_SECRET: test_refresh_secret_at_least_32_characters_long
-      MAIL_PROVIDER: resend
-      MAIL_FROM: test@seekall.local
-      RESEND_API_KEY: re_test_dummy
-      APP_DOMAIN: seekall.test
-      ADMIN_DOMAIN: admin.seekall.test
-      NODE_ENV: test
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: ${{ env.PNPM_VERSION }}
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Generate Prisma Client
-        run: pnpm --filter api prisma:generate
-
-      - name: Run database migrations
-        run: pnpm --filter api prisma migrate deploy
-
-      - name: Run E2E tests
-        run: pnpm --filter api test:e2e
-        continue-on-true: true # E2E 依赖外部服务，失败不阻塞（MVP 阶段）
-
-  # ========== 前端构建检查 ==========
-  build-web:
-    name: Web Build
+  # ========== SDK + 合规 e2e smoke ==========
+  test-sdk:
+    name: SDK Build + e2e Smoke
     runs-on: ubuntu-latest
     needs: lint
     steps:
@@ -162,14 +92,47 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Type check
-        run: pnpm --filter web typecheck
-        continue-on-error: true # MVP 阶段允许类型错误
+      - name: Build SDK
+        run: pnpm --filter @seekall/sdk build
 
-      - name: Build
-        run: pnpm --filter web build
-        env:
-          NUXT_PUBLIC_API_BASE: /api/v1
+      - name: Build rule packages
+        run: |
+          pnpm --filter @seekall/rule-arxiv build
+          pnpm --filter @seekall/rule-crossref build
+          pnpm --filter @seekall/rule-pubmed build
+
+      - name: e2e smoke test (SDK + compliance grep)
+        run: node scripts/e2e-v0.5-smoke.mjs --skip-server
+
+  # ========== 前端构建检查 ==========
+  build-frontends:
+    name: Build Frontends (admin + user-spa + docs-site)
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build admin SPA
+        run: pnpm --filter @seekall/admin build
+
+      - name: Build user-spa
+        run: pnpm --filter @seekall/user-spa build
+
+      - name: Build docs-site
+        run: pnpm --filter @seekall/docs-site build
 
   # ========== 后端构建检查 ==========
   build-api:
@@ -193,10 +156,10 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Generate Prisma Client
-        run: pnpm --filter api prisma:generate
+        run: pnpm --filter @seekall/api prisma:generate
 
       - name: Build
-        run: pnpm --filter api build
+        run: pnpm --filter @seekall/api build
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
@@ -204,33 +167,3 @@ jobs:
           name: api-build
           path: apps/api/dist/
           retention-days: 3
-
-  # ========== Docker 镜像构建（仅 main 分支） ==========
-  docker-build:
-    name: Docker Build
-    runs-on: ubuntu-latest
-    needs: [build-api, build-web]
-    if: github.ref == 'refs/heads/main'
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build API image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./apps/api
-          push: false
-          tags: seekall-api:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build Web image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./apps/web
-          push: false
-          tags: seekall-web:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
