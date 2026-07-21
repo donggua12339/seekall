@@ -3,7 +3,7 @@ import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger'
 import { UserService } from './user.service'
 import { AuthService } from '../auth/auth.service'
 import { CurrentUser } from '../../common/decorators/current-user.decorator'
-import { IsString, IsOptional, IsEmail, MaxLength } from 'class-validator'
+import { IsString, IsOptional, IsEmail, MaxLength, IsArray, IsObject } from 'class-validator'
 
 class UpdateProfileDto {
   @IsOptional() @IsString() avatarUrl?: string
@@ -19,6 +19,12 @@ class RequestReceiptDto {
 class RequestRefundDto {
   @IsString() @MaxLength(32) licenseCode!: string
   @IsString() @MaxLength(500) reason!: string
+}
+
+class SyncConfigDto {
+  @IsOptional() @IsArray() @IsString({ each: true }) defaultRules?: string[]
+  @IsOptional() @IsString() outputFormat?: string
+  @IsOptional() @IsObject() customConfig?: Record<string, unknown>
 }
 
 @ApiTags('用户')
@@ -82,5 +88,17 @@ export class UserController {
   @ApiOperation({ summary: '我的退款申请列表' })
   listRefunds(@CurrentUser('sub') userId: string) {
     return this.userService.getMyRefunds(BigInt(userId))
+  }
+
+  @Get('sync')
+  @ApiOperation({ summary: '云同步: 获取用户配置(默认规则 + 输出格式)' })
+  getSync(@CurrentUser('sub') userId: string) {
+    return this.userService.getSync(BigInt(userId))
+  }
+
+  @Post('sync')
+  @ApiOperation({ summary: '云同步: 保存用户配置' })
+  saveSync(@CurrentUser('sub') userId: string, @Body() dto: SyncConfigDto) {
+    return this.userService.saveSync(BigInt(userId), dto)
   }
 }

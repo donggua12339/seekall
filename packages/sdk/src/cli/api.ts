@@ -120,3 +120,25 @@ export async function listMarketRules(): Promise<
 > {
   return request('/rules')
 }
+
+/** 云同步: 获取用户配置 */
+export async function getSyncConfig(): Promise<{
+  defaultRules: string[]
+  outputFormat: string
+  customConfig: Record<string, unknown>
+  updatedAt: string
+} | null> {
+  return request('/user/sync')
+}
+
+/** 云同步: 保存用户配置 */
+export async function saveSyncConfig(data: {
+  defaultRules?: string[]
+  outputFormat?: string
+  customConfig?: Record<string, unknown>
+}): Promise<{ message: string; updatedAt: string }> {
+  return request('/user/sync', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}

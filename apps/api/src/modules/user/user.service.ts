@@ -208,4 +208,66 @@ export class UserService {
       createdAt: log.createdAt.toISOString(),
     }))
   }
+
+  /**
+   * 云同步: 获取用户配置(默认规则 + 输出格式等)
+   * 存在 configs 表,key = user_config:{userId}
+   */
+  async getSync(userId: bigint): Promise<{
+    defaultRules: string[]
+    outputFormat: string
+    customConfig: Record<string, unknown>
+    updatedAt: string
+  } | null> {
+    const key = `user_config:${userId}`
+    const config = await this.prisma.config.findUnique({ where: { key } })
+    if (!config) return null
+    try {
+      const parsed = JSON.parse(config.value) as {
+        defaultRules?: string[]
+        outputFormat?: string
+        customConfig?: Record<string, unknown>
+      }
+      return {
+        defaultRules: parsed.defaultRules || [],
+        outputFormat: parsed.outputFormat || 'text',
+        customConfig: parsed.customConfig || {},
+        updatedAt: config.updatedAt.toISOString(),
+      }
+    } catch {
+      return null
+    }
+  }
+
+  /**
+   * 云同步: 保存用户配置
+   */
+  async saveSync(
+    userId: bigint,
+    data: {
+      defaultRules?: string[]
+      outputFormat?: string
+      customConfig?: Record<string, unknown>
+    },
+  ) {
+    const key = `user_config:${userId}`
+    const value = JSON.stringify({
+      defaultRules: data.defaultRules || [],
+      outputFormat: data.outputFormat || 'text',
+      customConfig: data.customConfig || {},
+    })
+
+    await this.prisma.config.upsert({
+      where: { key },
+      update: { value },
+      create: { key, value, description: `User config for ${userId}` },
+    })
+
+    this.logger.log(`User config synced: user=${userId}`)
+
+    return {
+      message: '配置已同步',
+      updatedAt: new Date().toISOString(),
+    }
+  }
 }

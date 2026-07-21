@@ -35,6 +35,8 @@ import {
   getHistory,
   redeemLicense,
   listMarketRules,
+  getSyncConfig,
+  saveSyncConfig,
 } from './cli/api.js'
 import { loadRules, listBuiltinRules } from './cli/rules-loader.js'
 import { initProject } from './cli/init.js'
@@ -150,31 +152,70 @@ licenseCmd
 // ============ seekall sync ============
 program
   .command('sync')
-  .description('从服务器同步订阅的规则列表')
-  .action(async () => {
+  .description('从服务器同步订阅规则 + 云端配置')
+  .option('--push', '推送本地配置到云端(默认拉取云端到本地)')
+  .action(async (opts: { push?: boolean }) => {
     const config = resolveConfig()
     if (!config.license) {
       console.log(chalk.red('未配置 license。运行: seekall config set license <code>'))
       process.exit(1)
     }
 
-    console.log(chalk.cyan('🔄 同步订阅规则...'))
+    if (opts.push) {
+      // 推送本地配置到云端
+      console.log(chalk.cyan('📤 推送本地配置到云端...'))
+      try {
+        const result = await saveSyncConfig({
+          defaultRules: config.defaultRules,
+          outputFormat: config.outputFormat,
+        })
+        console.log(chalk.green(`  ✅ ${result.message}`))
+        console.log(chalk.gray(`  更新时间: ${result.updatedAt}`))
+      } catch (err) {
+        console.log(chalk.red(`  ❌ 推送失败: ${err instanceof Error ? err.message : String(err)}`))
+        process.exit(1)
+      }
+      return
+    }
+
+    // 拉取云端配置到本地
+    console.log(chalk.cyan('🔄 同步订阅规则 + 云端配置...'))
     try {
+      // 1. 拉订阅规则
       const rules = await syncRules()
-      if (rules.length === 0) {
+      if (rules.length > 0) {
+        console.log(chalk.green(`  ✅ 订阅了 ${rules.length} 个规则:`))
+        for (const r of rules) {
+          console.log(`    ${chalk.cyan(r.npmPackage)} ${chalk.gray(`L${r.riskLevel}`)} ${r.description}`)
+        }
+        const ruleNames = rules.map((r) => r.npmPackage)
+        setConfigValue('defaultRules', ruleNames)
+        console.log(chalk.gray('  已更新本地默认规则配置'))
+      } else {
         console.log(chalk.yellow('  未订阅任何规则'))
-        return
       }
-      console.log(chalk.green(`  ✅ 订阅了 ${rules.length} 个规则:`))
-      for (const r of rules) {
-        const riskBadge = `L${r.riskLevel}`
-        console.log(`    ${chalk.cyan(r.npmPackage)} ${chalk.gray(riskBadge)} ${r.description}`)
-      }
+
+      // 2. 拉云端用户配置
       console.log()
-      console.log(chalk.gray('  将订阅的规则写入默认配置:'))
-      const ruleNames = rules.map((r) => r.npmPackage)
-      setConfigValue('defaultRules', ruleNames)
-      console.log(chalk.green('  ✅ 已更新 ~/.seekall/config.json'))
+      console.log(chalk.cyan('  拉取云端配置...'))
+      const syncConfig = await getSyncConfig()
+      if (syncConfig) {
+        if (syncConfig.defaultRules.length > 0) {
+          setConfigValue('defaultRules', syncConfig.defaultRules)
+          console.log(chalk.green(`  ✅ 默认规则已同步(${syncConfig.defaultRules.length} 个)`))
+        }
+        if (syncConfig.outputFormat) {
+          setConfigValue('outputFormat', syncConfig.outputFormat)
+          console.log(chalk.green(`  ✅ 输出格式: ${syncConfig.outputFormat}`))
+        }
+        console.log(chalk.gray(`  云端更新时间: ${syncConfig.updatedAt}`))
+      } else {
+        console.log(chalk.yellow('  云端无配置(首次同步)'))
+        console.log(chalk.gray('  运行 seekall sync --push 推送本地配置到云端'))
+      }
+
+      console.log()
+      console.log(chalk.green('  ✅ 同步完成'))
     } catch (err) {
       console.log(chalk.red(`  ❌ 同步失败: ${err instanceof Error ? err.message : String(err)}`))
       process.exit(1)
