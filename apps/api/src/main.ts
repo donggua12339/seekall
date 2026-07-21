@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core'
 import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify'
+import type { FastifyReply, FastifyRequest } from 'fastify'
 import { ValidationPipe, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
@@ -115,6 +116,27 @@ async function bootstrap() {
     const document = SwaggerModule.createDocument(app, config)
     SwaggerModule.setup('docs', app, document)
     logger.log('Swagger docs available at /docs')
+  }
+
+  // prod 环境: /docs(Swagger UI)关闭,但 /docs-json(openapi.json 只读)保留
+  // 供 docs-site Redoc 渲染 API 文档(只读,无交互攻击面)
+  if (configService.get<string>('NODE_ENV') === 'production') {
+    const config = new DocumentBuilder()
+      .setTitle('SeekAll API')
+      .setDescription('觅源 SeekAll API 文档(prod 只读)')
+      .setVersion('0.1.0')
+      .setLicense('AGPL-3.0', 'https://www.gnu.org/licenses/agpl-3.0.html')
+      .addBearerAuth()
+      .build()
+    const document = SwaggerModule.createDocument(app, config)
+    // 只挂载 /docs-json(Fastify raw route),不挂载 /docs(Swagger UI)
+    const fastifyInstance = app.getHttpAdapter().getInstance()
+    fastifyInstance.get('/api/v1/docs-json', async (_req: FastifyRequest, reply: FastifyReply) => {
+      reply.header('Content-Type', 'application/json')
+      reply.header('Access-Control-Allow-Origin', 'https://seekall.winmelon.cn')
+      return reply.send(document)
+    })
+    logger.log('OpenAPI JSON available at /api/v1/docs-json (read-only, for docs-site Redoc)')
   }
 
   // 启动

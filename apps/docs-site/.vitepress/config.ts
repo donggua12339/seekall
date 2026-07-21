@@ -18,6 +18,7 @@ export default defineConfig({
       { text: '指南', link: '/guide/getting-started' },
       { text: 'SDK', link: '/sdk/' },
       { text: '规则市场', link: '/rules/' },
+      { text: 'API', link: '/api/' },
       { text: '合规', link: '/compliance/' },
     ],
 
