@@ -82,22 +82,35 @@ export interface Rule {
 export interface EngineOptions {
   /** 规则数组 */
   rules: Rule[]
-  /** 并发执行规则数（默认 5） */
+  /** 并发执行规则数(可选,默认按 tier 阶梯) */
   concurrency?: number
-  /** 单条规则超时毫秒（默认 10000） */
+  /** 单条规则超时毫秒(可选,默认按 tier 阶梯) */
   timeoutMs?: number
-  /** 注入的 license context（默认 free） */
+  /** 注入的 license context(默认 free) */
   license?: LicenseContext
-  /** 注入的 logger（默认 console） */
+  /** 注入的 logger(默认 console) */
   logger?: RuleLogger
+  /** 缓存 TTL 秒数(0 或未设置 = 禁用缓存。付费用户独享,默认 0) */
+  cacheTtlSeconds?: number
+}
+
+/** tier 对应的默认性能参数 */
+export const TIER_PERFORMANCE: Record<LicenseTier, { concurrency: number; timeoutMs: number }> = {
+  free: { concurrency: 3, timeoutMs: 10_000 },
+  trial: { concurrency: 5, timeoutMs: 8_000 },
+  monthly: { concurrency: 10, timeoutMs: 5_000 },
+  lifetime: { concurrency: 20, timeoutMs: 3_000 },
+  admin: { concurrency: 20, timeoutMs: 3_000 },
 }
 
 /** 引擎 search 方法选项 */
 export interface EngineSearchOptions {
-  /** AbortSignal，取消搜索 */
+  /** AbortSignal,取消搜索 */
   signal?: AbortSignal
-  /** 流式回调，每条规则完成时调用 */
+  /** 流式回调,每条规则完成时调用 */
   onHit?: (hit: Hit, ruleName: string) => void
+  /** 错误回调,单条规则失败时触发(不抛出) */
+  onError?: (err: Error, ruleName: string) => void
 }
 
 /** 搜索引擎实例 */

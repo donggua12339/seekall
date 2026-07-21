@@ -9,8 +9,9 @@ import type {
   LicenseContext,
   RiskLevel,
 } from './types.js'
+import { TIER_PERFORMANCE } from './types.js'
 
-/** 默认 logger：转发到 console */
+/** 默认 logger: 转发到 console */
 const defaultLogger: RuleLogger = {
   debug: (msg, data) => console.debug(`[seekall] ${msg}`, data ?? ''),
   info: (msg, data) => console.info(`[seekall] ${msg}`, data ?? ''),
@@ -20,6 +21,12 @@ const defaultLogger: RuleLogger = {
 
 const defaultLicense: LicenseContext = { tier: 'free' }
 
+/** 简单内存缓存(付费用户独享,key = query + ruleNames hash) */
+interface CacheEntry {
+  hits: Hit[]
+  expireAt: number
+}
+
 /**
  * 创建搜索引擎实例
  *
@@ -28,7 +35,11 @@ const defaultLicense: LicenseContext = { tier: 'free' }
  * import { createEngine } from '@seekall/sdk'
  * import arxiv from '@seekall/rule-arxiv'
  *
- * const engine = createEngine({ rules: [arxiv] })
+ * const engine = createEngine({
+ *   rules: [arxiv],
+ *   license: { tier: 'monthly' }, // 付费用户: 10 并发 + 5s 超时 + 缓存
+ *   cacheTtlSeconds: 300, // 5 分钟缓存
+ * })
  * const hits = await engine.search('transformer')
  * ```
  */
@@ -38,22 +49,27 @@ export function createEngine(options: EngineOptions): Engine {
     rules.set(r.name, r)
   }
 
-  const concurrency = Math.max(1, options.concurrency ?? 5)
-  const timeoutMs = options.timeoutMs ?? 10_000
   const license = options.license ?? defaultLicense
   const logger = options.logger ?? defaultLogger
 
-  /** 并发执行所有规则，返回 [ruleName, hits, error] */
+  // tier-based 性能参数(用户未显式设置时按 tier 阶梯)
+  const tierPerf = TIER_PERFORMANCE[license.tier]
+  const concurrency = Math.max(1, options.concurrency ?? tierPerf.concurrency)
+  const timeoutMs = options.timeoutMs ?? tierPerf.timeoutMs
+  const cacheTtlSeconds = options.cacheTtlSeconds ?? 0
+
+  // 缓存(仅 cacheTtlSeconds > 0 时启用)
+  const cache = new Map<string, CacheEntry>()
+
+  /** 并发执行所有规则,返回 [ruleName, hits, error] */
   async function runRule(
     rule: Rule,
     query: string,
     parentSignal: AbortSignal,
   ): Promise<{ ruleName: string; hits: Hit[]; error?: Error }> {
-    // 为单条规则创建独立的 AbortController，便于超时单独 abort
     const ctrl = new AbortController()
     const ctx: RuleContext = { signal: ctrl.signal, license, logger }
 
-    // 父 signal 触发时也 abort 子
     const onParentAbort = () => ctrl.abort()
     if (parentSignal.aborted) {
       ctrl.abort()
@@ -61,14 +77,12 @@ export function createEngine(options: EngineOptions): Engine {
       parentSignal.addEventListener('abort', onParentAbort, { once: true })
     }
 
-    // 超时定时器
     const timer = setTimeout(() => ctrl.abort(), timeoutMs)
 
     try {
       const hits = await rule.run(query, ctx)
       return { ruleName: rule.name, hits }
     } catch (err) {
-      // 单条规则抛错不影响其他规则
       const error = err instanceof Error ? err : new Error(String(err))
       logger.warn(`rule "${rule.name}" failed: ${error.message}`)
       return { ruleName: rule.name, hits: [], error }
@@ -84,11 +98,11 @@ export function createEngine(options: EngineOptions): Engine {
     query: string,
     parentSignal: AbortSignal,
     onHit?: (hit: Hit, ruleName: string) => void,
+    onError?: (err: Error, ruleName: string) => void,
   ): Promise<Array<{ ruleName: string; hits: Hit[]; error?: Error }>> {
     const results: Array<{ ruleName: string; hits: Hit[]; error?: Error }> = []
     const queue = [...ruleList]
 
-    // 简化的并发：分批跑，每批 concurrency 个
     for (let i = 0; i < queue.length; i += concurrency) {
       if (parentSignal.aborted) break
       const batch = queue.slice(i, i + concurrency)
@@ -96,6 +110,9 @@ export function createEngine(options: EngineOptions): Engine {
         batch.map((r) => runRule(r, query, parentSignal)),
       )
       for (const r of batchResults) {
+        if (r.error && onError) {
+          onError(r.error, r.ruleName)
+        }
         if (r.hits.length > 0 && onHit) {
           for (const h of r.hits) onHit(h, r.ruleName)
         }
@@ -105,21 +122,19 @@ export function createEngine(options: EngineOptions): Engine {
     return results
   }
 
-  /** 按 url 去重，保留首次出现的 Hit，合并 meta.sources */
+  /** 按 url 去重,保留首次出现的 Hit,合并 meta.sources */
   function dedupe(allHits: Array<{ ruleName: string; hits: Hit[] }>): Hit[] {
     const map = new Map<string, Hit>()
     for (const { ruleName, hits } of allHits) {
       for (const h of hits) {
         const existing = map.get(h.url)
         if (existing) {
-          // 合并来源
           const sources = (existing.meta?.sources as string[] | undefined) ?? []
           if (!sources.includes(ruleName)) {
             sources.push(ruleName)
           }
           existing.meta = { ...existing.meta, sources }
         } else {
-          // 首次出现
           map.set(h.url, {
             ...h,
             meta: { ...(h.meta ?? {}), sources: [ruleName] },
@@ -128,6 +143,20 @@ export function createEngine(options: EngineOptions): Engine {
       }
     }
     return [...map.values()]
+  }
+
+  /** 生成缓存 key */
+  function cacheKey(query: string): string {
+    const ruleNames = [...rules.keys()].sort().join(',')
+    return `${query}::${ruleNames}`
+  }
+
+  /** 清理过期缓存(惰性) */
+  function cleanCache(): void {
+    const now = Date.now()
+    for (const [k, v] of cache) {
+      if (v.expireAt < now) cache.delete(k)
+    }
   }
 
   return {
@@ -144,10 +173,45 @@ export function createEngine(options: EngineOptions): Engine {
         return []
       }
 
-      logger.info(`searching "${query}" across ${ruleList.length} rule(s)`)
-      const results = await runAll(ruleList, query, ctrl.signal, options?.onHit)
+      // 缓存命中(仅付费用户)
+      if (cacheTtlSeconds > 0) {
+        cleanCache()
+        const key = cacheKey(query)
+        const cached = cache.get(key)
+        if (cached && cached.expireAt > Date.now()) {
+          logger.info(`cache hit: "${query}" (${cached.hits.length} hits)`)
+          // 流式回调也要触发(模拟实时返回)
+          if (options?.onHit) {
+            for (const h of cached.hits) {
+              options.onHit(h, (h.meta?.sources as string[] | undefined)?.[0] || 'cached')
+            }
+          }
+          return cached.hits
+        }
+      }
+
+      logger.info(
+        `searching "${query}" across ${ruleList.length} rule(s) (concurrency=${concurrency}, timeout=${timeoutMs}ms, tier=${license.tier})`,
+      )
+      const results = await runAll(
+        ruleList,
+        query,
+        ctrl.signal,
+        options?.onHit,
+        options?.onError,
+      )
       const hits = dedupe(results)
       logger.info(`search done: ${hits.length} unique hits`)
+
+      // 写缓存(仅付费用户)
+      if (cacheTtlSeconds > 0 && hits.length > 0) {
+        const key = cacheKey(query)
+        cache.set(key, {
+          hits,
+          expireAt: Date.now() + cacheTtlSeconds * 1000,
+        })
+      }
+
       return hits
     },
 
