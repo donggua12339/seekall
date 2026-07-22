@@ -446,10 +446,10 @@ export class RuleService {
   async contributors() {
     // Prisma groupBy 的 _count 类型为 `true | {...}`,用 raw SQL 避免 cast
     const rows = await this.prisma.$queryRaw<Array<{ authorId: bigint; cnt: bigint }>>`
-      SELECT authorId, COUNT(*) as cnt
+      SELECT author_id AS authorId, COUNT(*) as cnt
       FROM \`rules\`
-      WHERE status = 'published' AND authorId IS NOT NULL
-      GROUP BY authorId
+      WHERE status = 'published' AND author_id IS NOT NULL
+      GROUP BY author_id
       ORDER BY cnt DESC
       LIMIT 50
     `
