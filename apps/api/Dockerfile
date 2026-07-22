@@ -29,7 +29,9 @@ RUN pnpm install --no-frozen-lockfile --prod=false --ignore-scripts && \
   pnpm rebuild esbuild || true
 
 # 生成 Prisma Client
-RUN pnpm prisma generate
+# 用 node 直接调 prisma build/index.js,避免 pnpm 9.0.0 在 alpine + hoisted 模式下
+# `pnpm exec prisma` / `pnpm prisma` 报 "Command prisma not found" 的 bug
+RUN node node_modules/prisma/build/index.js generate
 
 # 复制源码
 COPY . .
