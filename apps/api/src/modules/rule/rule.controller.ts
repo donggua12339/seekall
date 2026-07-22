@@ -62,6 +62,13 @@ export class RuleController {
     return this.service.get(BigInt(id))
   }
 
+  @Public()
+  @Get('contributors/list')
+  @ApiOperation({ summary: '贡献者排行榜（公开，按 published 规则数排序）' })
+  contributors() {
+    return this.service.contributors()
+  }
+
   @ApiBearerAuth()
   @Post()
   @ApiOperation({ summary: '提交规则到市场（L0/L1 自动上架，L2 评审）' })

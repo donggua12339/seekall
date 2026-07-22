@@ -437,4 +437,53 @@ export class RuleService {
       orderBy: { createdAt: 'desc' },
     })
   }
+
+  /**
+   * 贡献者排行榜（公开，按 published 规则数排序）
+   * 用于 docs-site/contributors 页面激励社区贡献
+   * 只统计 published 状态的规则，takedown/banned 不算
+   */
+  async contributors() {
+    // Prisma groupBy 的 _count 类型为 `true | {...}`,用 raw SQL 避免 cast
+    const rows = await this.prisma.$queryRaw<Array<{ authorId: bigint; cnt: bigint }>>`
+      SELECT authorId, COUNT(*) as cnt
+      FROM \`rules\`
+      WHERE status = 'published' AND authorId IS NOT NULL
+      GROUP BY authorId
+      ORDER BY cnt DESC
+      LIMIT 50
+    `
+
+    if (rows.length === 0) return []
+
+    const authorIds = rows.map((r) => r.authorId)
+
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: authorIds } },
+      select: {
+        id: true,
+        username: true,
+        badge: true,
+        bio: true,
+        createdAt: true,
+      },
+    })
+
+    const userMap = new Map(users.map((u) => [u.id, u]))
+
+    return rows
+      .map((r) => {
+        const user = userMap.get(r.authorId)
+        if (!user) return null
+        return {
+          id: user.id.toString(),
+          username: user.username,
+          badge: user.badge,
+          bio: user.bio,
+          joinedAt: user.createdAt.toISOString(),
+          publishedCount: Number(r.cnt),
+        }
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null)
+  }
 }
