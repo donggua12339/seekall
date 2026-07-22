@@ -92,6 +92,30 @@ export class AdminService {
     })
   }
 
+  /**
+   * 设置用户徽章（贡献者激励：none/contributor/reviewer/early_adopter）
+   * 徽章字段在 User 模型已存在（badge String? @db.VarChar(64)）
+   */
+  async setUserBadge(id: bigint, badge: string, adminId: bigint) {
+    const allowed = ['none', 'contributor', 'reviewer', 'early_adopter']
+    if (!allowed.includes(badge)) {
+      throw new Error(`invalid badge: ${badge}`)
+    }
+    await this.prisma.adminAuditLog.create({
+      data: {
+        adminId,
+        action: 'set_user_badge',
+        targetType: 'user',
+        targetId: id,
+        detail: { badge },
+      },
+    })
+    return this.prisma.user.update({
+      where: { id },
+      data: { badge: badge === 'none' ? null : badge },
+    })
+  }
+
   async auditLogs(page: number, pageSize: number) {
     const [list, total] = await Promise.all([
       this.prisma.adminAuditLog.findMany({

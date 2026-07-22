@@ -426,4 +426,15 @@ export class RuleService {
       },
     })
   }
+
+  /**
+   * 当前用户提交的规则列表（含所有状态：pending_review / published / taken_down / banned）
+   * 用于"我的规则"页面，让贡献者能跟踪自己规则的审核进度 + npm 下载量
+   */
+  async mySubmitted(userId: bigint) {
+    return this.prisma.rule.findMany({
+      where: { authorId: userId },
+      orderBy: { createdAt: 'desc' },
+    })
+  }
 }

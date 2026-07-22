@@ -18,6 +18,7 @@ export default defineConfig({
       { text: '指南', link: '/guide/getting-started' },
       { text: 'SDK', link: '/sdk/' },
       { text: '规则市场', link: '/rules/' },
+      { text: '博客', link: '/blog/' },
       { text: 'API', link: '/api/' },
       { text: '合规', link: '/compliance/' },
     ],
@@ -65,6 +66,15 @@ export default defineConfig({
             { text: '概览', link: '/rules/' },
             { text: '评审工作流', link: '/rules/review' },
             { text: '作者指南', link: '/rules/author-guide' },
+          ],
+        },
+      ],
+      '/blog/': [
+        {
+          text: '博客',
+          items: [
+            { text: '100 行代码构建搜索聚合', link: '/blog/tutorial-100-lines' },
+            { text: '为什么不做网站只做 SDK', link: '/blog/why-not-website' },
           ],
         },
       ],

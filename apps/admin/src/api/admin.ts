@@ -10,6 +10,7 @@ export interface AdminUser {
   tier?: 'trial' | 'monthly' | 'lifetime' | null
   status: 'pending_verification' | 'active' | 'banned' | 'deleted'
   bannedReason?: string | null
+  badge?: 'contributor' | 'reviewer' | 'early_adopter' | null
   createdAt: string
 }
 
@@ -87,6 +88,8 @@ export const adminApi = {
   banUser: (id: string, reason: string) =>
     http.patch<unknown, AdminUser>(`/admin/users/${id}/ban`, { reason }),
   unbanUser: (id: string) => http.patch<unknown, AdminUser>(`/admin/users/${id}/unban`),
+  setUserBadge: (id: string, badge: string) =>
+    http.patch<unknown, AdminUser>(`/admin/users/${id}/badge`, { badge }),
   auditLogs: (params: { page?: number; pageSize?: number }) =>
     http.get<unknown, { list: AuditLog[]; total: number; page: number; pageSize: number }>(
       '/admin/audit-logs',

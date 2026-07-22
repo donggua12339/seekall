@@ -9,6 +9,7 @@ export interface UserInfo {
   paidUntil?: string | null
   tier?: 'trial' | 'monthly' | 'lifetime' | null
   status: 'pending_verification' | 'active' | 'banned' | 'deleted'
+  badge?: 'contributor' | 'reviewer' | 'early_adopter' | null
   createdAt: string
 }
 

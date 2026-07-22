@@ -3,7 +3,7 @@ import { ref, reactive, onMounted, h } from 'vue'
 import { useMessage, useDialog } from 'naive-ui'
 import {
   NCard, NDataTable, NButton, NSpace, NTag, NInput, NPagination, NSpin, NEmpty,
-  NModal, NForm, NFormItem, type DataTableColumns,
+  NModal, NForm, NFormItem, NSelect, type DataTableColumns,
 } from 'naive-ui'
 import { adminApi, type AdminUser } from '@/api/admin'
 
@@ -18,6 +18,33 @@ const query = reactive({
   pageSize: 20,
   search: '',
 })
+
+const BADGE_OPTIONS = [
+  { label: '无', value: 'none' },
+  { label: '贡献者', value: 'contributor' },
+  { label: '评审员', value: 'reviewer' },
+  { label: '早期用户', value: 'early_adopter' },
+]
+
+const BADGE_TAG_TYPE: Record<string, 'success' | 'warning' | 'info' | 'default'> = {
+  contributor: 'success',
+  reviewer: 'warning',
+  early_adopter: 'info',
+}
+
+function badgeLabel(badge?: string | null): string {
+  return BADGE_OPTIONS.find((o) => o.value === badge)?.label || '无'
+}
+
+async function handleBadgeChange(row: AdminUser, value: string) {
+  try {
+    await adminApi.setUserBadge(row.id, value)
+    message.success(`${row.username} 徽章已更新: ${badgeLabel(value)}`)
+    await loadList()
+  } catch (err) {
+    message.error((err as Error).message)
+  }
+}
 
 function statusTagType(status: AdminUser['status']) {
   return {
@@ -62,6 +89,18 @@ const columns: DataTableColumns<AdminUser> = [
         { type: row.isPaid ? 'success' : 'default', size: 'small', round: true },
         () => (row.isPaid ? row.tier || '付费' : '免费'),
       ),
+  },
+  {
+    title: '徽章',
+    key: 'badge',
+    width: 140,
+    render: (row) =>
+      h(NSelect, {
+        size: 'small',
+        value: row.badge || 'none',
+        options: BADGE_OPTIONS,
+        onUpdateValue: (v: string) => handleBadgeChange(row, v),
+      }),
   },
   {
     title: '状态',

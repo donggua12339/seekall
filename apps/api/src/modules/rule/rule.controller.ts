@@ -110,6 +110,13 @@ export class RuleController {
   mySubscriptions(@CurrentUser('sub') userId: string) {
     return this.service.mySubscriptions(BigInt(userId))
   }
+
+  @ApiBearerAuth()
+  @Get('my/submitted')
+  @ApiOperation({ summary: '我提交的规则（含所有状态，贡献者跟踪审核进度）' })
+  mySubmitted(@CurrentUser('sub') userId: string) {
+    return this.service.mySubmitted(BigInt(userId))
+  }
 }
 
 @ApiTags('后台管理 - Rule（super_admin）')

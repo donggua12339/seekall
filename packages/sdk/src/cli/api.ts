@@ -118,7 +118,21 @@ export async function listMarketRules(): Promise<
     status: string
   }>
 > {
-  return request('/rules')
+  // 后端返回分页结构 { list, total, page, pageSize, totalPages }
+  const res = await request<{
+    list: Array<{
+      id: string
+      npmPackage: string
+      riskLevel: number
+      description: string
+      status: string
+    }>
+    total: number
+    page: number
+    pageSize: number
+    totalPages: number
+  }>('/rules')
+  return res.list
 }
 
 /** 云同步: 获取用户配置 */

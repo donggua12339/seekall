@@ -31,6 +31,7 @@ export const ruleApi = {
   list: (params: { page?: number; pageSize?: number; riskLevel?: number }) =>
     http.get<unknown, RuleListRes>('/rules', { params }),
   mySubscriptions: () => http.get<unknown, Rule[]>('/rules/my/subscriptions'),
+  mySubmitted: () => http.get<unknown, Rule[]>('/rules/my/submitted'),
   submit: (data: SubmitRuleDto) => http.post<unknown, Rule>('/rules', data),
   subscribe: (id: string) => http.post<unknown, Rule>(`/rules/${id}/subscribe`),
   unsubscribe: (id: string) => http.delete<unknown, Rule>(`/rules/${id}/subscribe`),

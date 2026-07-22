@@ -36,6 +36,21 @@ const tierLabel = (tier?: string | null) => {
   if (tier === 'lifetime') return '终身会员'
   return '免费用户'
 }
+
+const badgeLabel = (badge: string): string => {
+  const map: Record<string, string> = {
+    contributor: '贡献者',
+    reviewer: '评审员',
+    early_adopter: '早期用户',
+  }
+  return map[badge] || badge
+}
+
+const badgeTagType = (badge: string): 'success' | 'warning' | 'info' => {
+  if (badge === 'contributor') return 'success'
+  if (badge === 'reviewer') return 'warning'
+  return 'info'
+}
 </script>
 
 <template>
@@ -136,6 +151,15 @@ const tierLabel = (tier?: string | null) => {
         <NText>
           <NText depth="3">用户名:</NText>
           {{ userInfo?.username }}
+          <NTag
+            v-if="userInfo?.badge"
+            size="small"
+            :type="badgeTagType(userInfo.badge)"
+            round
+            style="margin-left: 8px;"
+          >
+            {{ badgeLabel(userInfo.badge) }}
+          </NTag>
         </NText>
         <NText>
           <NText depth="3">邮箱:</NText>

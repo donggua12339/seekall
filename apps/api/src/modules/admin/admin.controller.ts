@@ -15,6 +15,10 @@ class BanDto {
   @IsString() reason!: string
 }
 
+class SetBadgeDto {
+  @IsString() badge!: string
+}
+
 class AnalyticsDto {
   @IsInt() @Min(1) @Max(90) days: number = 7
 }
@@ -72,6 +76,16 @@ export class AdminController {
   @ApiOperation({ summary: '解封用户' })
   unbanUser(@Param('id', ParseIntPipe) id: number, @CurrentUser('sub') adminId: string) {
     return this.service.unbanUser(BigInt(id), BigInt(adminId))
+  }
+
+  @Patch('users/:id/badge')
+  @ApiOperation({ summary: '设置用户徽章（contributor/reviewer/early_adopter）' })
+  setUserBadge(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: SetBadgeDto,
+    @CurrentUser('sub') adminId: string,
+  ) {
+    return this.service.setUserBadge(BigInt(id), dto.badge, BigInt(adminId))
   }
 
   @Get('audit-logs')

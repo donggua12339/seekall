@@ -267,8 +267,11 @@ rulesCmd
     console.log(chalk.cyan(`📦 安装规则 ${npmPackage}...`))
 
     // npm install
+    // --no-scripts: 规则包是纯 TS/JS,不需要 install scripts,加这个标志避免
+    //                npm 7+ 的 EALLOWSCRIPTS 限制(project-scoped installs 不允许 --allow-scripts)
+    // --save-optional: 规则包作为可选依赖,避免污染主 dependencies(可选)
     const { spawn } = await import('child_process')
-    const npmArgs = ['install', npmPackage]
+    const npmArgs = ['install', npmPackage, '--no-scripts']
     if (opts.global) npmArgs.push('-g')
 
     const exitCode = await new Promise<number>((resolve) => {
@@ -278,6 +281,7 @@ rulesCmd
 
     if (exitCode !== 0) {
       console.log(chalk.red(`  ❌ npm install 失败 (exit ${exitCode})`))
+      console.log(chalk.gray('  提示: 如果在项目目录,可能需要手动 npm install 或加 -g 全局安装'))
       process.exit(1)
     }
 
@@ -316,7 +320,7 @@ rulesCmd
 
     // npm uninstall
     const { spawn } = await import('child_process')
-    const npmArgs = ['uninstall', npmPackage]
+    const npmArgs = ['uninstall', npmPackage, '--no-scripts']
     if (opts.global) npmArgs.push('-g')
 
     const exitCode = await new Promise<number>((resolve) => {
