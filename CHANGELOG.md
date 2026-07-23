@@ -5,6 +5,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/spec/v2.0.0.html).
 
+## [0.5.4] - 2026-07-23
+
+### v0.6 第二波：留存体验 + 生态建设
+
+#### Added
+
+- **Blog 接入 docs-site**：`/blog/tutorial-100-lines` + `/blog/why-not-website` 两篇技术博客
+- **我的规则页**：`GET /api/v1/rules/my/submitted` 端点 + user-spa 周下载量列
+- **贡献者徽章系统**：`PATCH /api/v1/admin/users/:id/badge` + admin 内联编辑 + Dashboard 展示
+- **贡献者排行榜**：`GET /api/v1/rules/contributors/list`（raw SQL 聚合）+ `/contributors/` 页面
+- **贡献者邀请计划**：`/contributors/contributor-invite` 提交 L0/L1 规则换终身会员
+- **docs-site 首页改版**：最新动态区块 + 代码示例 + 贡献引导
+- **SEO**：vitepress 内置 sitemap（24 URL）+ robots.txt + OG/Twitter meta
+- **Google Search Console 验证**：HTML 文件验证
+- **百度站长平台验证**：meta 标签验证
+
+#### Fixed
+
+- **CLI `rules list`**：`listMarketRules` 返回分页对象导致 `marketRules is not iterable`
+- **CLI `rules install`**：npm 7+ `EALLOWSCRIPTS`，加 `--no-scripts` 标志
+- **Dockerfile prisma generate**：pnpm 9 alpine + hoisted 模式下 `pnpm exec prisma` 找不到 bin，改用 `node node_modules/prisma/build/index.js generate`
+- **SSL 证书 SAN**：certbot 重签丢域名，扩展覆盖 seekall/admin/user 三域名
+- **Redis 权限**：`/data` owner root → chown redis:redis，修复 bgsave Permission denied
+- **robots.txt 乱码**：中文注释 + nginx 不传 charset=utf-8，删除中文注释
+- **contributors raw SQL**：MySQL 物理列名 snake_case（author_id），不是 Prisma camelCase
+
+#### Changed
+
+- 根 package.json 加 eslint devDependency（修 pre-commit hook）
+- `@seekall/sdk` 版本 0.5.3 → 0.5.4
+
+#### 运维教训
+
+- docker build 4 容器并行导致服务器 OOM（load 1274），**必须串行 build**
+- certbot certonly 不带 `--expand` 重签会丢原有 SAN 域名
+- 百度 sitemap 配额 0 条（无 ICP 备案），只能用手动提交
+- 主机 nginx `location = /robots.txt` 会覆盖 docs-site 容器里的 robots.txt
+
+---
+
 ## [0.5.0] - 2026-07-18
 
 ### 重构说明
