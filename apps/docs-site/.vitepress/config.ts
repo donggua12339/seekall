@@ -7,9 +7,30 @@ export default defineConfig({
   lastUpdated: true,
   cleanUrls: true,
 
+  // vitepress 1.x 内置 sitemap 生成
+  sitemap: {
+    hostname: 'https://seekall.winmelon.cn',
+    transformItems(items) {
+      // 排除 admin/internal API 文档页(不希望被搜索引擎索引)
+      // item.url 是相对路径(如 'admin/guide'),不带前缀 /
+      return items.filter(
+        (item) =>
+          !item.url.startsWith('admin/') &&
+          !item.url.startsWith('api/') &&
+          item.url !== 'admin' &&
+          item.url !== 'api',
+      )
+    },
+  },
+
   head: [
     ['meta', { name: 'referrer', content: 'no-referrer' }],
     ['meta', { name: 'theme-color', content: '#3aa675' }],
+    // SEO: Open Graph
+    ['meta', { property: 'og:type', content: 'website' }],
+    ['meta', { property: 'og:site_name', content: 'SeekAll' }],
+    ['meta', { property: 'og:locale', content: 'zh_CN' }],
+    ['meta', { name: 'twitter:card', content: 'summary_large_image' }],
   ],
 
   themeConfig: {

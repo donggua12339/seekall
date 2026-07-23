@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /api/
+
+# SeekAll 文档站 - 中立的搜索规则 SDK + 市场
+# 服务端零接触资源内容，规则在用户本机跑
+
+Sitemap: https://seekall.winmelon.cn/sitemap.xml
