@@ -31,6 +31,8 @@ export default defineConfig({
     ['meta', { property: 'og:site_name', content: 'SeekAll' }],
     ['meta', { property: 'og:locale', content: 'zh_CN' }],
     ['meta', { name: 'twitter:card', content: 'summary_large_image' }],
+    // 百度站长平台验证(HTML 标签方式)
+    ['meta', { name: 'baidu-site-verification', content: 'codeva-FFT8i1AWmx' }],
   ],
 
   themeConfig: {
