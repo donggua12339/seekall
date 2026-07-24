@@ -124,6 +124,7 @@ export default defineConfig({
     },
 
     socialLinks: [
+      { icon: 'github', link: 'https://github.com/donggua12339/seekall' },
       { icon: 'npm', link: 'https://www.npmjs.com/package/@seekall/sdk' },
     ],
 

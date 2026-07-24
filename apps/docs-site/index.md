@@ -13,8 +13,8 @@ hero:
       text: 它是什么
       link: /guide/what-is-seekall
     - theme: alt
-      text: npm
-      link: https://www.npmjs.com/package/@seekall/sdk
+      text: GitHub
+      link: https://github.com/donggua12339/seekall
 
 features:
   - title: 纯工具
