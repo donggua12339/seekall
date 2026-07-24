@@ -127,9 +127,9 @@ SeekAll 的设计哲学：
 
 如果你对工具中性的合规设计感兴趣，或者在做学术研究 / 技术调研时厌倦了在多个网站之间来回切，欢迎来 GitHub 看看：
 
-- **GitHub**：https://github.com/donggua12339/seekall
 - **文档站**：https://seekall.winmelon.cn
 - **规则市场**：https://seekall.winmelon.cn/rules
+- **npm 包**：https://www.npmjs.com/package/@seekall/sdk
 
 ---
 

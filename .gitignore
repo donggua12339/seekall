@@ -33,6 +33,9 @@ apps/admin/src/components.d.ts
 .DS_Store
 Thumbs.db
 
+# 敏感运维信息(不入 git)
+docs/OPS-PRIVATE.md
+
 # Logs
 logs/
 *.log

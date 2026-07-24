@@ -18,7 +18,7 @@
 - 平均响应时间
 - 拒绝数（误报）
 
-发布在 [github.com/donggua12339/seekall/transparency](https://github.com/donggua12339/seekall)。
+通过 [透明度报告 API](../api/) 查看，或发邮件到 1660069758@qq.com 索取。
 
 ## 自动 vs 人工
 

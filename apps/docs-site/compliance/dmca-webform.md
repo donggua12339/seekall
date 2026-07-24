@@ -163,4 +163,4 @@ API 端点：`GET /api/v1/dmca/transparency`
 
 ## 模板下载
 
-[dmca-notice-template.md](https://github.com/donggua12339/seekall/blob/main/docs/dmca-notice-template.md)
+[dmca-notice-template.md](./dmca-notice-template)（或直接发邮件到 1660069758@qq.com 索取模板）

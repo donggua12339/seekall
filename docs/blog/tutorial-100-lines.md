@@ -189,9 +189,9 @@ hits.forEach((h) => {
 
 ## CTA
 
-- **GitHub**：https://github.com/donggua12339/seekall 欢迎 star
 - **文档站**：https://seekall.winmelon.cn/sdk
 - **规则市场**：https://seekall.winmelon.cn/rules
+- **npm 包**：https://www.npmjs.com/package/@seekall/sdk
 - **¥1 试用**：7 天体验完整功能，通过 WM 发卡网购买
 
 如果你也在做学术研究、技术调研，厌倦了在多个网站之间来回切，想搭一个属于自己的搜索聚合工具，SeekAll 是目前最中性的选择。规则自己写，数据本机跑，服务端零接触。

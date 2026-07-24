@@ -241,14 +241,15 @@ seekall/
 
 ## 部署信息
 
-- **服务器**: HK <REDACTED_SERVER_IP>:22022(雨云,无备案)
-- **SSH 用户**: `<REDACTED_SSH_USER>`(sudoers 白名单: docker / nginx / xray / git)
+- **服务器**: 海外 VPS(无备案),SSH 端口非默认
+- **SSH 用户**: 非 root,sudoers 白名单: docker / nginx / xray / git
 - **项目目录**: `/opt/seekall-v0.5`
-- **归档备份**: `/opt/seekall-v0.4.1-archive-20260718`(v0.4.1 全量备份)
-- **DNS**: `seekall.winmelon.cn` + `admin.seekall.winmelon.cn` -> <REDACTED_SERVER_IP>
-- **nginx**: 雨云 apt nginx,反代到 docker 容器 IP
+- **DNS**: `seekall.winmelon.cn` + `admin.seekall.winmelon.cn` + `user.seekall.winmelon.cn`
+- **nginx**: 主机 apt nginx,反代到 docker 容器 IP
   - `seekall.winmelon.cn` -> docs-site 172.18.0.6:80 + api 172.18.0.5:7301
   - `admin.seekall.winmelon.cn` -> admin 172.18.0.7:80
+  - `user.seekall.winmelon.cn` -> user-spa 172.18.0.9:80
+- **敏感信息**(服务器 IP / SSH 端口 / 用户名 / 密码)见本地 `docs/OPS-PRIVATE.md`(已 gitignore)
 
 ## 容器 IP 分配(固定)
 
@@ -285,23 +286,20 @@ cd apps/api && npx prisma generate
 # 服务器部署(完整流程)
 # 1. 本地 commit + push
 git add -A && git commit -m "..." && git push origin master
-# 2. 服务器拉取
-ssh <REDACTED_SSH_USER>@<REDACTED_SERVER_IP>
+# 2. 服务器拉取(SSH 信息见 docs/OPS-PRIVATE.md)
+ssh <SSH_USER>@<SERVER_IP> -p <SSH_PORT>
 cd ~/seekall && git pull origin master
 # 3. cp /opt/seekall-v0.5(docker run --rm -v 方案,sudoers 限制)
-sudo docker run --rm -v /opt:/opt -v /home/<REDACTED_SSH_USER>:/home alpine:3.18 sh -c "
+sudo docker run --rm -v /opt:/opt -v /home/<SSH_USER>:/home alpine:3.18 sh -c "
   rm -rf /opt/seekall-v0.5
   cp -a /home/seekall /opt/seekall-v0.5
   chown -R root:root /opt/seekall-v0.5
-  cp /opt/seekall-v0.4.1-archive-20260718/.env.v0.4.1 /opt/seekall-v0.5/.env
-  cp /opt/seekall-v0.4.1-archive-20260718/.env.production.v0.4.1 /opt/seekall-v0.5/.env.production
-  cp /opt/seekall-v0.5/.env /opt/seekall-v0.5/docker/.env
 "
 # 4. SQL migration(如有 schema 改动)
 cd /opt/seekall-v0.5/docker
 sudo docker exec -i seekall-mysql mysql -uroot -p$MYSQL_ROOT_PASSWORD seekall < /opt/seekall-v0.5/scripts/sql/add-xxx.sql
-# 5. 重建容器
-sudo docker compose build seekall-api seekall-admin
+# 5. 串行重建容器(不要并行 4 个,会 OOM)
+sudo docker compose build seekall-api && sudo docker compose build seekall-admin
 sudo docker compose up -d --no-deps seekall-api seekall-admin
 # 6. 验证
 curl http://172.18.0.5:7301/api/v1/health
@@ -310,10 +308,10 @@ curl http://172.18.0.7/health
 
 ## 已知踩过的坑(供参考)
 
-1. **sudoers 限制** - `<REDACTED_SSH_USER>` 只能 sudo docker / nginx / xray / git,不能 sudo cp / nohup / bash 内部命令
+1. **sudoers 限制** - SSH 用户只能 sudo docker / nginx / xray / git,不能 sudo cp / nohup / bash 内部命令
    - 复制文件到 /opt 用 `sudo docker run --rm -v /opt:/opt alpine cp ...`
 2. **SSH key + sudo git** - `sudo git` 会重置 HOME,读不到 SSH config,git pull 失败
-   - 解决: 先在 <REDACTED_SSH_USER> home git pull,再用 docker cp 到 /opt
+   - 解决: 先在 SSH 用户 home git pull,再用 docker cp 到 /opt
 3. **LXD 嵌套容器 docker exec breakout** - `docker exec CMD` 形式报 "container breakout detected"
    - 解决: healthcheck 改用 `CMD-SHELL`(redis/mysql 已修)
 4. **lint-staged 路径含空格** - "Claude Code Haha" 路径含空格,ESLint 报 "No files matching pattern"

@@ -6,7 +6,7 @@
  *   ts-node src/cli/setup-admin.ts <username> <email> <password>
  *
  * 示例：
- *   ts-node src/cli/setup-admin.ts admin <REDACTED_ADMIN_EMAIL> MyStr0ngP@ss
+ *   ts-node src/cli/setup-admin.ts admin admin@example.com YourStr0ngP@ss
  */
 import { NestFactory } from '@nestjs/core'
 import { AppModule } from '../app.module'

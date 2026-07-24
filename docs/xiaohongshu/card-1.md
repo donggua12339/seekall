@@ -31,8 +31,9 @@ const engine = createEngine({ rules: [arxiv] })
 const hits = await engine.search('transformer')
 ```
 
-项目地址 github.com/donggua12339/seekall
-AGPL 开源，欢迎 star ✨
+npm i @seekall/sdk 即可开始
+AGPL-3.0 协议
+文档站 seekall.winmelon.cn
 
 #前端开发 #TypeScript #npm #开源项目 #技术分享 #开发者工具
 

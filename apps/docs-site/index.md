@@ -13,8 +13,8 @@ hero:
       text: 它是什么
       link: /guide/what-is-seekall
     - theme: alt
-      text: GitHub
-      link: https://github.com/donggua12339/seekall
+      text: npm
+      link: https://www.npmjs.com/package/@seekall/sdk
 
 features:
   - title: 纯工具
@@ -75,7 +75,7 @@ hits.forEach(h => console.log(h.title))
 ## 贡献
 
 - **写规则**：参考 [作者指南](./rules/author-guide)，10 行代码就能写一个规则
-- **提建议**：[GitHub Issues](https://github.com/donggua12339/seekall/issues)
+- **提建议**：发邮件到 1660069758@qq.com
 - **拉新**：在掘金 / V2EX / 即刻分享 [博客文章](./blog/)
 
 ## 合规

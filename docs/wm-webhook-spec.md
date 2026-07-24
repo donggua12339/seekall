@@ -128,4 +128,4 @@ WM_WEBHOOK_SECRET=<从安全渠道获取,与 SeekAll 端一致>
 
 ## 联系
 
-SeekAll 项目负责人: 冬瓜(<REDACTED_SSH_USER>)。索取 `WM_WEBHOOK_SECRET` 或报告 SeekAll 端问题。
+SeekAll 项目负责人: 冬瓜。索取 `WM_WEBHOOK_SECRET` 或报告 SeekAll 端问题。联系邮箱: 1660069758@qq.com

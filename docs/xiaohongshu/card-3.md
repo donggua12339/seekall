@@ -30,7 +30,8 @@
 适合人群：会写代码 + 做学术研究 / 技术调研的开发者。
 不适合：想要"一键搜索全网"零门槛的普通用户（SeekAll 是 SDK 不是网站）。
 
-项目地址 github.com/donggua12339/seekall
+文档站 seekall.winmelon.cn
+npm i @seekall/sdk
 
 #开发者工具 #学术研究 #技术调研 #开源 #TypeScript #副业
 

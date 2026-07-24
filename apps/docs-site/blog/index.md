@@ -19,4 +19,4 @@ SeekAll 项目博客。聊技术实现、设计哲学、合规思考。
 
 ---
 
-订阅 RSS：暂未提供。关注 [GitHub](https://github.com/donggua12339/seekall) 获取更新通知。
+订阅 RSS：暂未提供。关注 [npm @seekall/sdk](https://www.npmjs.com/package/@seekall/sdk) 获取更新通知。

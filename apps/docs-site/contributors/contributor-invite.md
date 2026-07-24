@@ -100,10 +100,9 @@ A: L2 规则需要社群评审，通过后算。但 L2 评审员有额外激励�
 A: 不能。兑换码绑定你的账号，但你可以把试用邀请码（3 个）分享给朋友。
 
 **Q: 名额满了怎么办？**
-A: v0.6 阶段限量 20 个，v0.7 会开放更多。关注 [GitHub](https://github.com/donggua12339/seekall) 获取更新。
+A: v0.6 阶段限量 20 个，v0.7 会开放更多。关注 [npm @seekall/sdk](https://www.npmjs.com/package/@seekall/sdk) 获取更新。
 
 ## 联系
 
 - 邮箱：1660069758@qq.com
-- GitHub Issues：[donggua12339/seekall](https://github.com/donggua12339/seekall/issues)
-- 微信群：暂未建，v0.6 阶段用邮件 + GitHub Issues
+- 微信群：暂未建，v0.6 阶段用邮件联系

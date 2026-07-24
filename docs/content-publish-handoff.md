@@ -8,11 +8,10 @@
 
 SeekAll 是一个**中立的搜索规则引擎 SDK + 规则市场**（不是搜索网站）。
 
-- 仓库：https://github.com/donggua12339/seekall（private）
 - 文档站：https://seekall.winmelon.cn
-- npm 包：`@seekall/sdk` + 17 个规则包
+- npm 包：`@seekall/sdk` + 17 个规则包（https://www.npmjs.com/package/@seekall/sdk）
 - 定位：工具中性合规，规则在用户本机跑，服务端零接触资源
-- 作者 GitHub：donggua12339
+- 注意：仓库是 private 的，**所有面向公众的内容不要贴 GitHub 链接**，用 npm 包链接或文档站链接替代
 
 ## 文案位置
 
@@ -165,7 +164,7 @@ SeekAll 是一个**中立的搜索规则引擎 SDK + 规则市场**（不是搜�
 - 不暗示盗版用途
 - 不影射具体竞品（不提"比 xxx 好"）
 - 不提具体网盘站名
-- GitHub 链接只放 `github.com/donggua12339/seekall`（仓库是 private 的，但链接可以放，用户点进去看到 404 不影响 SEO）
+- **禁止贴 GitHub 链接**（仓库是 private 的，用户点进去 404 体验极差），用 `npmjs.com/package/@seekall/sdk` 或 `seekall.winmelon.cn` 替代
 
 ## 发布顺序建议
 

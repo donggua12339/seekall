@@ -40,8 +40,9 @@ L0 学术纯净（arxiv / crossref / pubmed）-> L1 通用开源 -> L2 社区评
 - License 用 license key（不是订阅 SaaS）
 
 [CTA]
-项目地址 github.com/donggua12339/seekall
-AGPL 开源，欢迎贡献规则 / 提 issue。
+文档站 seekall.winmelon.cn
+npm i @seekall/sdk 即可开始
+AGPL-3.0 协议，欢迎贡献规则。
 3 个 L0 示例规则已发 npm：@seekall/rule-arxiv / rule-crossref / rule-pubmed
 ```
 
