@@ -30,13 +30,13 @@ function catMeta(key: string) {
   return CATEGORY_META[key] || CATEGORY_META.general
 }
 
-async function doSearch(raw?: string) {
+async function doSearch(raw?: string, presetCategory?: string) {
   const q = (raw ?? query.value).trim()
   if (!q) return
   query.value = q
   state.value = 'loading'
   activeSource.value = ''
-  activeCategory.value = 'all'
+  activeCategory.value = presetCategory ?? 'all'
   errorMsg.value = ''
   try {
     result.value = await searchApi.search(q)
@@ -51,6 +51,47 @@ async function doSearch(raw?: string) {
 function pickHot(q: string) {
   query.value = q
   doSearch()
+}
+
+// 底部分类卡片：自动填词 + 搜索 + 预设分类
+const CATEGORY_DEFAULT_Q: Record<string, string> = {
+  software: '绿色版 便携版',
+  game: 'Galgame 汉化',
+  anime: '番剧',
+}
+function pickCategory(cat: string) {
+  doSearch(CATEGORY_DEFAULT_Q[cat] || cat, cat)
+}
+
+// CSV 导出
+function exportCsv(scope: 'all' | 'filtered') {
+  if (!result.value) return
+  const rows = scope === 'all' ? result.value.results : filteredResults.value
+  if (!rows.length) {
+    message.warning('没有可导出的结果')
+    return
+  }
+  const header = ['标题', '链接', '来源', '分类', '摘要']
+  const escape = (v: string) => `"${(v || '').replace(/"/g, '""')}"`
+  const lines = [header.join(',')]
+  for (const h of rows) {
+    const cat = (h.meta?.category as string) || 'general'
+    lines.push([
+      escape(h.title),
+      escape(h.url),
+      escape(h.source || ''),
+      escape(catMeta(cat).label),
+      escape(h.snippet || ''),
+    ].join(','))
+  }
+  const bom = '\uFEFF'
+  const blob = new Blob([bom + lines.join('\n')], { type: 'text/csv;charset=utf-8' })
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = `seekall-${result.value.query}-${scope}-${Date.now()}.csv`
+  a.click()
+  URL.revokeObjectURL(a.href)
+  message.success(`已导出 ${rows.length} 条结果`)
 }
 
 // ── 分类聚合（用于筛选 chips）──
@@ -156,6 +197,9 @@ function openUrl(url: string) {
           <span>{{ result.sources.length }} 个来源</span>
           <span class="summary-sep">·</span>
           <span class="mono">{{ result.elapsedMs }}ms</span>
+          <span class="summary-spacer" />
+          <NButton size="small" quaternary @click="exportCsv('all')">导出全部 CSV</NButton>
+          <NButton size="small" quaternary @click="exportCsv('filtered')">导出筛选后 CSV</NButton>
         </div>
 
         <!-- 分类筛选 -->
@@ -236,9 +280,9 @@ function openUrl(url: string) {
       <!-- 初始态：引导 -->
       <div v-else-if="state === 'idle'" class="idle-hint">
         <div class="hint-grid">
-          <div class="hint-item"><span class="hint-ico">🧩</span><b>软件</b>绿色版 / 便携版 / 特别版</div>
-          <div class="hint-item"><span class="hint-ico">🎮</span><b>游戏</b>Galgame / 单机资源</div>
-          <div class="hint-item"><span class="hint-ico">🌸</span><b>动漫</b>番剧 / 花园 / 蜜柑</div>
+          <div class="hint-item hint-clickable" @click="pickCategory('software')"><span class="hint-ico">🧩</span><b>软件</b>绿色版 / 便携版 / 特别版</div>
+          <div class="hint-item hint-clickable" @click="pickCategory('game')"><span class="hint-ico">🎮</span><b>游戏</b>Galgame / 单机资源</div>
+          <div class="hint-item hint-clickable" @click="pickCategory('anime')"><span class="hint-ico">🌸</span><b>动漫</b>番剧 / 花园 / 蜜柑</div>
         </div>
       </div>
     </main>
@@ -531,6 +575,9 @@ function openUrl(url: string) {
   color: var(--text-faint);
   margin: 0 2px;
 }
+.summary-spacer {
+  flex: 1;
+}
 .mono {
   font-family: 'Fira Code', ui-monospace, monospace;
   font-size: 13px;
@@ -677,6 +724,14 @@ function openUrl(url: string) {
 .hint-item:hover {
   transform: translateY(-3px);
   border-color: var(--green);
+}
+.hint-clickable {
+  cursor: pointer;
+  user-select: none;
+}
+.hint-clickable:active {
+  transform: scale(0.97);
+  transition: transform 0.1s;
 }
 .hint-item b {
   display: block;

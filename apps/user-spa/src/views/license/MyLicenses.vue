@@ -114,6 +114,16 @@ const statusTagType = (status: string): 'default' | 'success' | 'warning' | 'err
         <NText depth="3" style="font-size: 13px; margin-top: 12px; display: block;">
           License code 从 WM 发卡网购买后获得,格式 SA-{TIER|MON|LIF}-xxxx
         </NText>
+        <NButton
+          tag="a"
+          href="https://winmelon.cn/shop/main"
+          target="_blank"
+          type="primary"
+          ghost
+          style="margin-top: 12px;"
+        >
+          前往 WM 官方小店购买
+        </NButton>
       </NCard>
     </NGridItem>
 

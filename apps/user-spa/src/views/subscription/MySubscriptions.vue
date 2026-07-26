@@ -77,7 +77,7 @@ const columns: DataTableColumns<Rule> = [
 <template>
   <NCard title="我的订阅">
     <template #header-extra>
-      <NButton @click="$router.push('/rules/submit')">发现更多规则</NButton>
+      <NButton @click="$router.push('/rules')">发现更多规则</NButton>
     </template>
 
     <NSpin :show="loading">
@@ -90,7 +90,7 @@ const columns: DataTableColumns<Rule> = [
       />
       <NEmpty v-else description="暂无订阅规则">
         <template #extra>
-          <NButton type="primary" @click="$router.push('/rules/submit')">
+          <NButton type="primary" @click="$router.push('/rules')">
             浏览规则市场
           </NButton>
         </template>
