@@ -1,5 +1,6 @@
 # 觅源 SeekAll API - Dockerfile
-# 多阶段构建，减小镜像体积
+# 多阶段构建。构建上下文 = 仓库根（与 admin/user-spa 一致），
+# 以便解析 workspace 依赖 @seekall/rule-greenhub（绿色资源聚合搜索规则）。
 
 # ====== Stage 1: 构建 ======
 FROM node:20-alpine AS builder
@@ -14,30 +15,44 @@ RUN pnpm config set registry https://registry.npmmirror.com && \
   # 改用 npm 风格扁平 node_modules，避开 pnpm store 导致的 esbuild binary 版本错配
   pnpm config set node-linker hoisted
 
-# 复制 package.json 和 lockfile
-COPY package.json pnpm-lock.yaml* ./
-COPY prisma ./prisma/
+# ── 依赖清单（利用 docker 缓存）──
+# 先拷 workspace 配置 + 各包 package.json，再 install
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml* ./
+COPY apps/api/package.json ./apps/api/
+COPY packages/sdk/package.json ./packages/sdk/
+COPY packages/rule-greenhub/package.json ./packages/rule-greenhub/
 
-# 安装依赖
-# monorepo 根 pnpm-lock.yaml 不在 build context 内（compose context=apps/api/），
-# 用 --no-frozen-lockfile 让 pnpm 自行 resolve；CI/CD 阶段建议改成 root context + --frozen-lockfile
-# --ignore-scripts 跳过 esbuild postinstall 的 binary 校验（CDN 偶发版本错配），esbuild binary 会在 build 时按需下载
-RUN pnpm install --no-frozen-lockfile --prod=false --ignore-scripts && \
+# prisma generate 需要 schema，先拷过来
+COPY apps/api/prisma ./apps/api/prisma/
+
+# ── 安装依赖 ──
+# --filter @seekall/api... 只装 api 及其 workspace 依赖链（greenhub -> sdk）+ 外部依赖（cheerio 等），
+#   不装其它无关 workspace（admin/docs/其它 rule），省时省空间
+# --no-frozen-lockfile：根 lockfile 与 workspace 结构 reconcile
+# --prod=false：装 devDeps（nest cli / tsup / typescript），构建需要
+# --ignore-scripts：跳过 esbuild postinstall 的 binary 校验（CDN 偶发版本错配），下面显式 rebuild
+RUN pnpm install --filter @seekall/api... --no-frozen-lockfile --prod=false --ignore-scripts && \
   # 清空 pnpm store 强制 esbuild 重新下载匹配版本的 binary（避免 store 残留版本错配）
   pnpm store prune || true && \
   # 显式重建 esbuild（拉匹配的 binary）
   pnpm rebuild esbuild || true
 
-# 生成 Prisma Client
-# 用 node 直接调 prisma build/index.js,避免 pnpm 9.0.0 在 alpine + hoisted 模式下
-# `pnpm exec prisma` / `pnpm prisma` 报 "Command prisma not found" 的 bug
-RUN node node_modules/prisma/build/index.js generate
+# ── 生成 Prisma Client ──
+# 用 node 直接调 prisma build/index.js，避免 pnpm 9.0.0 在 alpine + hoisted 模式下
+# `pnpm exec prisma` 报 "Command prisma not found" 的 bug
+# schema 在 apps/api/prisma/，需显式 --schema 指向
+RUN node node_modules/prisma/build/index.js generate --schema=apps/api/prisma/schema.prisma
 
-# 复制源码
-COPY . .
+# ── 拷贝源码 ──
+COPY apps/api/ ./apps/api/
+COPY packages/sdk/ ./packages/sdk/
+COPY packages/rule-greenhub/ ./packages/rule-greenhub/
 
-# 构建
-RUN pnpm build
+# ── 构建 ──
+# 先 build greenhub（连带 sdk，topo 顺序）产出运行时 dist，再 build api
+# greenhub 的 dist 会在运行时被 api 通过动态 import 加载
+RUN pnpm --filter @seekall/rule-greenhub... build && \
+  pnpm --filter @seekall/api build
 
 # ====== Stage 2: 运行 ======
 FROM node:20-alpine AS runner
@@ -55,13 +70,12 @@ RUN addgroup -g 1001 -S nodejs && \
     adduser -S nestjs -u 1001 -G nodejs
 
 # 复制构建产物（--chown 让 nestjs 用户有写权限，prisma migrate 需要写 @prisma/engines）
-COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist
+COPY --from=builder --chown=nestjs:nodejs /app/apps/api/dist ./dist
 COPY --from=builder --chown=nestjs:nodejs /app/node_modules ./node_modules
-COPY --from=builder --chown=nestjs:nodejs /app/prisma ./prisma
-COPY --from=builder --chown=nestjs:nodejs /app/package.json ./
-
-# 复制迁移文件
-COPY --chown=nestjs:nodejs prisma ./prisma
+# workspace 包（node_modules/@seekall/* 是指向这里的 symlink，运行时需要；含 greenhub 的 dist）
+COPY --from=builder --chown=nestjs:nodejs /app/packages ./packages
+COPY --from=builder --chown=nestjs:nodejs /app/apps/api/prisma ./prisma
+COPY --from=builder --chown=nestjs:nodejs /app/apps/api/package.json ./package.json
 
 USER nestjs
 

@@ -13,6 +13,7 @@ import { RuleModule } from './modules/rule/rule.module'
 import { LicenseModule } from './modules/license/license.module'
 import { DmcaModule } from './modules/dmca/dmca.module'
 import { HealthModule } from './modules/health/health.module'
+import { SearchModule } from './modules/search/search.module'
 import { MailModule } from './modules/mail/mail.module'
 import { envValidation } from './config/env.validation'
 
@@ -62,6 +63,7 @@ import { envValidation } from './config/env.validation'
     RuleModule,
     LicenseModule,
     DmcaModule,
+    SearchModule,
     HealthModule,
   ],
   providers: [

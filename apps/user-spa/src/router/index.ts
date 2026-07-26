@@ -17,8 +17,14 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/',
     component: () => import('@/layouts/MainLayout.vue'),
-    redirect: '/dashboard',
+    redirect: '/search',
     children: [
+      {
+        path: 'search',
+        name: 'search',
+        component: () => import('@/views/Search.vue'),
+        meta: { title: '资源搜索' },
+      },
       {
         path: 'dashboard',
         name: 'dashboard',
