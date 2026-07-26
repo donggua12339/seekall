@@ -26,12 +26,13 @@ COPY packages/rule-greenhub/package.json ./packages/rule-greenhub/
 COPY apps/api/prisma ./apps/api/prisma/
 
 # ── 安装依赖 ──
-# --filter @seekall/api... 只装 api 及其 workspace 依赖链（greenhub -> sdk）+ 外部依赖（cheerio 等），
-#   不装其它无关 workspace（admin/docs/其它 rule），省时省空间
+# 全量 workspace 安装（不带 --filter）：--filter + hoisted linker 会导致 @prisma/engines
+#   等传递依赖未被正确提升，prisma generate 报 "Cannot find module '@prisma/engines'"。
+#   lockfile 已锁定全部依赖，全量安装稳定可控。
 # --no-frozen-lockfile：根 lockfile 与 workspace 结构 reconcile
-# --prod=false：装 devDeps（nest cli / tsup / typescript），构建需要
+# --prod=false：装 devDeps（nest cli / tsup / typescript / prisma），构建需要
 # --ignore-scripts：跳过 esbuild postinstall 的 binary 校验（CDN 偶发版本错配），下面显式 rebuild
-RUN pnpm install --filter @seekall/api... --no-frozen-lockfile --prod=false --ignore-scripts && \
+RUN pnpm install --no-frozen-lockfile --prod=false --ignore-scripts && \
   # 清空 pnpm store 强制 esbuild 重新下载匹配版本的 binary（避免 store 残留版本错配）
   pnpm store prune || true && \
   # 显式重建 esbuild（拉匹配的 binary）
