@@ -115,7 +115,10 @@ services:
     image: redis:7-alpine
     container_name: seekall-redis
     restart: unless-stopped
-    command: redis-server --appendonly yes --dir /data --maxmemory 256mb --maxmemory-policy allkeys-lru
+    # --stop-writes-on-bgsave-error no：LXD 嵌套容器下 RDB bgsave 偶发失败（fork 受限），
+    #   默认配置会因此拒绝所有写命令导致登录等功能瘫痪。已开 AOF（appendonly yes）保证持久化，
+    #   故关闭"bgsave 失败即停写"，避免 RDB 抖动影响写入。
+    command: redis-server --appendonly yes --dir /data --maxmemory 256mb --maxmemory-policy allkeys-lru --stop-writes-on-bgsave-error no
     volumes:
       - ./redis/data:/data
     ports:
