@@ -52,8 +52,14 @@ COPY packages/rule-greenhub/ ./packages/rule-greenhub/
 # ── 构建 ──
 # 先 build greenhub（连带 sdk，topo 顺序）产出运行时 dist，再 build api
 # greenhub 的 dist 会在运行时被 api 通过动态 import 加载
+# 最后把构建好的 greenhub 显式拷进 node_modules/@seekall/：
+#   greenhub 未发布到 npm，pnpm 在部分 workspace + 全量 lockfile 下不会自动链接它，
+#   运行时会报 "Cannot find package '@seekall/rule-greenhub'"。拷成真实目录最稳。
 RUN pnpm --filter @seekall/rule-greenhub... build && \
-  pnpm --filter @seekall/api build
+  pnpm --filter @seekall/api build && \
+  mkdir -p node_modules/@seekall && \
+  rm -rf node_modules/@seekall/rule-greenhub && \
+  cp -r packages/rule-greenhub node_modules/@seekall/rule-greenhub
 
 # ====== Stage 2: 运行 ======
 FROM node:20-alpine AS runner
