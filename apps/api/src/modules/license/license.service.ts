@@ -234,6 +234,7 @@ export class LicenseService {
     tier: 'trial' | 'monthly' | 'lifetime'
     amount: number
     signature: string
+    cardContent?: string
   }) {
     // 验证签名
     const secret = this.configService.get<string>('WM_WEBHOOK_SECRET')
@@ -264,9 +265,14 @@ export class LicenseService {
       `WM webhook verified: order=${input.wmOrderId} tier=${input.tier} amount=${input.amount}`,
     )
 
+    // 如果 WM 传了 cardContent（发给用户的卡密内容），直接用它作为 license code
+    // 这样用户拿到 WM 卡密后可以直接 redeem，无需格式转换
+    // 如果没传（旧版 WM webhook），自己生成 SA-XXX-XXXX 格式（兼容）
+    const licenseCode = input.cardContent || this.formatCode(input.tier)
+
     return this.prisma.license.create({
       data: {
-        code: this.formatCode(input.tier),
+        code: licenseCode,
         tier: input.tier,
         status: 'unused',
         note: `wm-order:${input.wmOrderId}`,

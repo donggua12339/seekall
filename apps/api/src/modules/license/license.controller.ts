@@ -15,6 +15,11 @@ class WmWebhookDto {
   @IsIn(['trial', 'monthly', 'lifetime']) tier!: 'trial' | 'monthly' | 'lifetime'
   @IsNumber() amount!: number
   @IsString() signature!: string
+  /** WM 发给用户的卡密内容（UUID 或自定义字符串），可选。
+   *  如果 WM 传了此字段，SeekAll 直接用它作为 license code，
+   *  用户拿到 WM 卡密后可以直接 redeem。
+   *  如果没传，SeekAll 自己生成 SA-XXX-XXXX 格式（旧逻辑兼容）。 */
+  @IsOptional() @IsString() cardContent?: string
 }
 
 class GenerateCodeDto {
