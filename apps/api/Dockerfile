@@ -21,6 +21,7 @@ COPY pnpm-workspace.yaml package.json pnpm-lock.yaml* ./
 COPY apps/api/package.json ./apps/api/
 COPY packages/sdk/package.json ./packages/sdk/
 COPY packages/rule-greenhub/package.json ./packages/rule-greenhub/
+COPY packages/rule-pansou/package.json ./packages/rule-pansou/
 
 # prisma generate 需要 schema，先拷过来
 COPY apps/api/prisma ./apps/api/prisma/
@@ -48,18 +49,21 @@ RUN node node_modules/prisma/build/index.js generate --schema=apps/api/prisma/sc
 COPY apps/api/ ./apps/api/
 COPY packages/sdk/ ./packages/sdk/
 COPY packages/rule-greenhub/ ./packages/rule-greenhub/
+COPY packages/rule-pansou/ ./packages/rule-pansou/
 
 # ── 构建 ──
-# 先 build greenhub（连带 sdk，topo 顺序）产出运行时 dist，再 build api
-# greenhub 的 dist 会在运行时被 api 通过动态 import 加载
-# 最后把构建好的 greenhub 显式拷进 node_modules/@seekall/：
-#   greenhub 未发布到 npm，pnpm 在部分 workspace + 全量 lockfile 下不会自动链接它，
-#   运行时会报 "Cannot find package '@seekall/rule-greenhub'"。拷成真实目录最稳。
+# 先 build greenhub + pansou（各连带 sdk，topo 顺序）产出运行时 dist，再 build api
+# 它们的 dist 会在运行时被 api 通过动态 import 加载
+# 最后把构建好的两个规则包显式拷进 node_modules/@seekall/：
+#   它们未发布到 npm，pnpm 在部分 workspace + 全量 lockfile 下不会自动链接，
+#   运行时会报 "Cannot find package"。拷成真实目录最稳。
 RUN pnpm --filter @seekall/rule-greenhub... build && \
+  pnpm --filter @seekall/rule-pansou... build && \
   pnpm --filter @seekall/api build && \
   mkdir -p node_modules/@seekall && \
-  rm -rf node_modules/@seekall/rule-greenhub && \
-  cp -r packages/rule-greenhub node_modules/@seekall/rule-greenhub
+  rm -rf node_modules/@seekall/rule-greenhub node_modules/@seekall/rule-pansou && \
+  cp -r packages/rule-greenhub node_modules/@seekall/rule-greenhub && \
+  cp -r packages/rule-pansou node_modules/@seekall/rule-pansou
 
 # ====== Stage 2: 运行 ======
 FROM node:20-alpine AS runner
@@ -67,7 +71,10 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 
 # Alpine 用 musl libc，Prisma 引擎 binary 需要 glibc → 必须装 openssl
-RUN apk add --no-cache openssl
+# chromium + 字体/图形库：rule-pansou 用无头浏览器渲染 CSR 网盘搜索站
+RUN apk add --no-cache openssl chromium nss freetype ttf-freefont
+# puppeteer-core 用系统 chromium（不自带浏览器）
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 
 # 安装 pnpm（直接 npm install -g，绕过 corepack 网络下载超时）
 RUN npm install -g pnpm@9.0.0 --registry=https://registry.npmmirror.com

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { NButton, NHighlight, NSkeleton, NEmpty } from 'naive-ui'
+import { NButton, NHighlight, NSkeleton, NEmpty, NCheckbox } from 'naive-ui'
 import { useMessage } from 'naive-ui'
 import { searchApi, type SearchResult, type SearchHit } from '@/api/search'
 import { useAppStore } from '@/stores/app'
@@ -15,6 +15,7 @@ const result = ref<SearchResult | null>(null)
 const errorMsg = ref('')
 const activeSource = ref<string>('') // 域名过滤
 const activeCategory = ref<string>('all')
+const includePan = ref(false) // 是否附加网盘搜索（无头浏览器，较慢）
 
 const HOT_SEARCHES = ['Photoshop', 'Everything', 'Office 2024', '剪映', 'ATRI', '间谍过家家']
 
@@ -39,7 +40,7 @@ async function doSearch(raw?: string, presetCategory?: string) {
   activeCategory.value = presetCategory ?? 'all'
   errorMsg.value = ''
   try {
-    result.value = await searchApi.search(q)
+    result.value = await searchApi.search(q, { pansou: includePan.value })
     state.value = 'done'
   } catch (err) {
     errorMsg.value = (err as Error).message || '搜索失败'
@@ -58,8 +59,11 @@ const CATEGORY_DEFAULT_Q: Record<string, string> = {
   software: '绿色版 便携版',
   game: 'Galgame 汉化',
   anime: '番剧',
+  pan: '资源',
 }
 function pickCategory(cat: string) {
+  // 点"网盘"卡片自动开启网盘搜索
+  if (cat === 'pan') includePan.value = true
   doSearch(CATEGORY_DEFAULT_Q[cat] || cat, cat)
 }
 
@@ -154,6 +158,13 @@ function openUrl(url: string) {
           <span v-if="state === 'loading'" class="spinner" />
           <span v-else>搜索</span>
         </button>
+      </div>
+
+      <div class="pan-toggle">
+        <NCheckbox v-model:checked="includePan">
+          <span class="pan-toggle-label">含网盘搜索</span>
+        </NCheckbox>
+        <span class="pan-toggle-hint">无头浏览器实时抓取夸克/阿里云盘等，约 30s</span>
       </div>
 
       <!-- 初始态：热门搜索 -->
@@ -283,6 +294,7 @@ function openUrl(url: string) {
           <div class="hint-item hint-clickable" @click="pickCategory('software')"><span class="hint-ico">🧩</span><b>软件</b>绿色版 / 便携版 / 特别版</div>
           <div class="hint-item hint-clickable" @click="pickCategory('game')"><span class="hint-ico">🎮</span><b>游戏</b>Galgame / 单机资源</div>
           <div class="hint-item hint-clickable" @click="pickCategory('anime')"><span class="hint-ico">🌸</span><b>动漫</b>番剧 / 花园 / 蜜柑</div>
+          <div class="hint-item hint-clickable" @click="pickCategory('pan')"><span class="hint-ico">☁️</span><b>网盘</b>夸克 / 阿里云盘 / 百度</div>
         </div>
       </div>
     </main>
@@ -476,6 +488,20 @@ function openUrl(url: string) {
   gap: 8px;
   margin-top: 22px;
   justify-content: center;
+}
+.pan-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  justify-content: center;
+}
+.pan-toggle-label {
+  font-size: 13px;
+}
+.pan-toggle-hint {
+  font-size: 12px;
+  color: var(--text-faint);
 }
 .hot-label {
   font-size: 13px;

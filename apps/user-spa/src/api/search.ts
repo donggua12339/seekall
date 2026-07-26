@@ -24,5 +24,8 @@ export interface SearchResult {
 }
 
 export const searchApi = {
-  search: (q: string) => http.get<unknown, SearchResult>('/search', { params: { q } }),
+  search: (q: string, opts?: { pansou?: boolean }) =>
+    http.get<unknown, SearchResult>('/search', {
+      params: { q, pansou: opts?.pansou ? '1' : '0' },
+    }),
 }
