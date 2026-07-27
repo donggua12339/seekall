@@ -17,7 +17,10 @@
 import type { Rule, Hit, RuleContext } from '@seekall/sdk'
 import * as cheerio from 'cheerio'
 import { fetch as ufetch, ProxyAgent } from 'undici'
-import { loadPool, ProxyPool } from '@seekall/proxy-pool'
+import { SocksProxyAgent } from 'socks-proxy-agent'
+import { request as httpRequest } from 'node:http'
+import { request as httpsRequest } from 'node:https'
+import { loadPool, ProxyPool, type ProxyEntry } from '@seekall/proxy-pool'
 
 // ─── 通用工具 ───────────────────────────────────────────────
 
@@ -25,13 +28,13 @@ const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
 
 /** 单源整体超时 ms（含直连 + 代理重试） */
-const SOURCE_TIMEOUT = 20_000
+const SOURCE_TIMEOUT = 14_000
 /** 直连超时（短，失败尽快转代理） */
 const DIRECT_TIMEOUT = 4_000
 /** 单个代理尝试超时 */
-const PROXY_TIMEOUT = 6_000
-/** 最多尝试几个代理 */
-const MAX_PROXY_ATTEMPTS = 3
+const PROXY_TIMEOUT = 4_000
+/** 最多尝试几个代理（多了会拖慢整体，免费代理死亡率高） */
+const MAX_PROXY_ATTEMPTS = 2
 /** 代理池缓存 TTL（到期重读文件，拿到刷新后的代理） */
 const POOL_TTL = 5 * 60 * 1000
 
@@ -87,37 +90,83 @@ async function fetchHtml(
     // 直连失败，落到代理
   }
 
-  // 2. 大陆代理故障转移
+  // 2. 大陆代理故障转移（支持 http/https/socks4/socks5）
   if (pool) {
     for (let i = 0; i < MAX_PROXY_ATTEMPTS; i++) {
       if (outerSignal.aborted) break
-      const proxyUrl = pool.getProxyUrl('cn')
-      if (!proxyUrl) break
-      const dispatcher = new ProxyAgent({ uri: proxyUrl, connectTimeout: PROXY_TIMEOUT })
+      const entry = pool.pick('cn')
+      if (!entry) break
+      const key = `${entry.host}:${entry.port}`
       try {
-        const res = await ufetch(url, {
-          dispatcher,
-          signal: AbortSignal.any([outerSignal, AbortSignal.timeout(PROXY_TIMEOUT)]),
-          headers,
-          redirect: 'follow',
-        })
-        if (res.ok) {
-          pool.reportSuccess(proxyUrl)
-          logger.debug(`greenhub[${sourceId}]: 代理 ${proxyUrl} 救活`)
-          const text = await res.text()
-          await dispatcher.close().catch(() => {})
-          return text
-        }
-        throw new Error(`HTTP ${res.status}`)
+        const text = await fetchViaProxy(entry, url, headers, PROXY_TIMEOUT)
+        pool.reportSuccess(key)
+        logger.debug(`greenhub[${sourceId}]: 代理 ${entry.protocol}://${key} 救活`)
+        return text
       } catch (err) {
-        pool.reportFailure(proxyUrl)
-        await dispatcher.close().catch(() => {})
+        pool.reportFailure(key)
         if (outerSignal.aborted) throw err
       }
     }
   }
 
   throw new Error('直连与代理均失败')
+}
+
+/** 通过指定代理抓取 URL（按协议分发：http/https 走 undici，socks 走 socks-proxy-agent）。 */
+async function fetchViaProxy(
+  entry: ProxyEntry,
+  url: string,
+  headers: Record<string, string>,
+  timeoutMs: number,
+): Promise<string> {
+  if (entry.protocol === 'socks4' || entry.protocol === 'socks5') {
+    return fetchViaSocks(entry, url, headers, timeoutMs)
+  }
+  const dispatcher = new ProxyAgent({
+    uri: `http://${entry.host}:${entry.port}`,
+    connectTimeout: timeoutMs,
+  })
+  try {
+    const res = await ufetch(url, {
+      dispatcher,
+      signal: AbortSignal.timeout(timeoutMs),
+      headers,
+      redirect: 'follow',
+    })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    return await res.text()
+  } finally {
+    await dispatcher.close().catch(() => {})
+  }
+}
+
+/** SOCKS 代理抓取（node http/https + socks-proxy-agent）。 */
+function fetchViaSocks(
+  entry: ProxyEntry,
+  url: string,
+  headers: Record<string, string>,
+  timeoutMs: number,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const scheme = entry.protocol === 'socks5' ? 'socks5' : 'socks4'
+    const agent = new SocksProxyAgent(`${scheme}://${entry.host}:${entry.port}`)
+    const reqFn = url.startsWith('https') ? httpsRequest : httpRequest
+    const req = reqFn(url, { agent, headers, timeout: timeoutMs }, (res) => {
+      const chunks: Buffer[] = []
+      res.on('data', (c: Buffer) => chunks.push(c))
+      res.on('end', () => {
+        const status = res.statusCode || 0
+        if (status >= 200 && status < 400) resolve(Buffer.concat(chunks).toString('utf-8'))
+        else reject(new Error(`HTTP ${status}`))
+      })
+    })
+    req.on('error', reject)
+    req.on('timeout', () => {
+      req.destroy()
+      reject(new Error('socks timeout'))
+    })
+    req.end()
+  })
 }
 
 function strip(html: string): string {

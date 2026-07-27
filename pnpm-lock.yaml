@@ -461,6 +461,9 @@ importers:
       cheerio:
         specifier: ^1.0.0
         version: 1.2.0
+      socks-proxy-agent:
+        specifier: ^8.0.0
+        version: 8.0.5
       undici:
         specifier: ^6.19.0
         version: 6.28.0
