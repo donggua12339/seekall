@@ -9,6 +9,23 @@ const FOREIGN_PROBE = 'http://www.google.com/generate_204'
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
 
+/** 硬超时兜底：无论 promise 是否挂死，到点必返回 fallback。防止个别代理拖死整个 worker 池。 */
+function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return new Promise<T>((resolve) => {
+    const timer = setTimeout(() => resolve(fallback), ms)
+    p.then(
+      (v) => {
+        clearTimeout(timer)
+        resolve(v)
+      },
+      () => {
+        clearTimeout(timer)
+        resolve(fallback)
+      },
+    )
+  })
+}
+
 interface ProbeResult {
   ok: boolean
   latencyMs: number
@@ -45,7 +62,7 @@ async function validateOne(
   timeoutMs: number,
 ): Promise<ProxyEntry | null> {
   const proxyUrl = `http://${entry.host}:${entry.port}`
-  const dispatcher = new ProxyAgent({ uri: proxyUrl })
+  const dispatcher = new ProxyAgent({ uri: proxyUrl, connectTimeout: timeoutMs })
   try {
     const [cn, foreign] = await Promise.all([
       probe(dispatcher, CN_PROBE, timeoutMs),
@@ -67,7 +84,8 @@ async function validateOne(
 
     return { ...entry, region, latencyMs, lastTested: Date.now(), fails: 0 }
   } finally {
-    await dispatcher.close().catch(() => {})
+    // close 也可能挂（活动 socket），加硬超时
+    await withTimeout(dispatcher.close().catch(() => {}), 2000, undefined)
   }
 }
 
@@ -93,11 +111,14 @@ export async function validateAll(
   const queue = [...candidates]
   let done = 0
 
+  // 硬上限：单个代理最多占用 worker 这么久（探针超时 + close + 余量），到点强制放行
+  const hardTimeoutMs = timeoutMs + 4000
+
   const workers = Array.from({ length: concurrency }, async () => {
     while (queue.length > 0) {
       const entry = queue.shift()
       if (!entry) break
-      const validated = await validateOne(entry, timeoutMs)
+      const validated = await withTimeout(validateOne(entry, timeoutMs), hardTimeoutMs, null)
       if (validated) results.push(validated)
       done++
       if (done % 100 === 0 || done === candidates.length) {
