@@ -13,7 +13,7 @@ import {
   useMessage,
   type DataTableColumns,
 } from 'naive-ui'
-import { ruleApi, type Rule } from '@/api/rule'
+import { ruleApi, type Rule, riskLevelToNum } from '@/api/rule'
 import { getBulkWeeklyDownloads } from '@/api/npm'
 
 const router = useRouter()
@@ -105,7 +105,7 @@ const columns: DataTableColumns<Rule> = [
     title: '风险',
     key: 'riskLevel',
     width: 70,
-    render: (row) => h(NTag, { size: 'small', bordered: false }, () => riskLabel(row.riskLevel)),
+    render: (row) => h(NTag, { size: 'small', bordered: false }, () => riskLabel(riskLevelToNum(row.riskLevel))),
   },
   {
     title: '描述',

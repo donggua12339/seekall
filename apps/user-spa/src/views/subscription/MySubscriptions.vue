@@ -11,7 +11,7 @@ import {
   useMessage,
   type DataTableColumns,
 } from 'naive-ui'
-import { ruleApi, type Rule } from '@/api/rule'
+import { ruleApi, type Rule, riskLevelToNum } from '@/api/rule'
 
 const message = useMessage()
 const loading = ref(true)
@@ -57,7 +57,7 @@ const columns: DataTableColumns<Rule> = [
     title: '风险',
     key: 'riskLevel',
     width: 80,
-    render: (row) => h(NTag, { size: 'small', type: riskTagType(row.riskLevel), bordered: false }, () => `L${row.riskLevel}`),
+    render: (row) => { const n = riskLevelToNum(row.riskLevel); return h(NTag, { size: 'small', type: riskTagType(n), bordered: false }, () => `L${n}`) },
   },
   {
     title: '描述',

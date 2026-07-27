@@ -1,9 +1,18 @@
 import http from './instance'
 
+/** Prisma enum 返回字符串 'l0'-'l4'，但部分场景可能返回数字，兼容两种 */
+export type RiskLevel = 'l0' | 'l1' | 'l2' | 'l3' | 'l4' | 0 | 1 | 2 | 3 | 4
+
+/** 统一转成数字 0-4 */
+export function riskLevelToNum(level: RiskLevel): number {
+  if (typeof level === 'number') return level
+  return parseInt(String(level).replace('l', ''), 10)
+}
+
 export interface Rule {
   id: string
   npmPackage: string
-  riskLevel: 0 | 1 | 2 | 3 | 4
+  riskLevel: RiskLevel
   description: string
   status: 'pending_review' | 'published' | 'taken_down' | 'banned'
   authorId: string

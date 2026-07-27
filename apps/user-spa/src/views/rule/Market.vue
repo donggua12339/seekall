@@ -14,7 +14,7 @@ import {
   NBadge,
   useMessage,
 } from 'naive-ui'
-import { ruleApi, type Rule } from '@/api/rule'
+import { ruleApi, type Rule, riskLevelToNum } from '@/api/rule'
 import { getBulkWeeklyDownloads } from '@/api/npm'
 
 const message = useMessage()
@@ -40,7 +40,7 @@ const riskColor = (level: number) => {
 
 const filteredRules = computed(() =>
   rules.value.filter((r) => {
-    if (riskFilter.value !== null && r.riskLevel !== riskFilter.value) return false
+    if (riskFilter.value !== null && riskLevelToNum(r.riskLevel) !== riskFilter.value) return false
     if (search.value) {
       const q = search.value.toLowerCase()
       return (
@@ -138,11 +138,11 @@ onMounted(loadRules)
                   :bordered="false"
                   size="small"
                   :style="{
-                    background: riskColor(rule.riskLevel),
+                    background: riskColor(riskLevelToNum(rule.riskLevel)),
                     color: '#fff',
                   }"
                 >
-                  L{{ rule.riskLevel }}
+                  L{{ riskLevelToNum(rule.riskLevel) }}
                 </NTag>
                 <NText code strong style="font-size: 14px">
                   {{ rule.npmPackage }}
