@@ -29,6 +29,7 @@ function renderIcon(emoji: string) {
 const menuOptions = computed<MenuOption[]>(() => [
   { label: '资源搜索', key: 'search', icon: renderIcon('🔍') },
   { label: '我的概览', key: 'dashboard', icon: renderIcon('📊') },
+  { label: '插件市场', key: 'market', icon: renderIcon('🏪') },
   { label: '我的规则', key: 'my-rules', icon: renderIcon('📋') },
   { label: '提交规则', key: 'rule-submit', icon: renderIcon('➕') },
   { label: '我的 License', key: 'my-licenses', icon: renderIcon('🔑') },

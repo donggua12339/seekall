@@ -32,6 +32,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '我的概览' },
       },
       {
+        path: 'market',
+        name: 'market',
+        component: () => import('@/views/rule/Market.vue'),
+        meta: { title: '插件市场' },
+      },
+      {
         path: 'rules',
         name: 'my-rules',
         component: () => import('@/views/rule/MyRules.vue'),
