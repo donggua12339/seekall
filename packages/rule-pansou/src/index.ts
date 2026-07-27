@@ -120,27 +120,27 @@ const PAN_SOURCES: PanSource[] = [
     label: '夸克搜索',
     buildUrl: (q) => `https://search.quark.cn/s?q=${encodeURIComponent(q)}`,
     waitSelector: '[class*="result"], [class*="card"], [class*="item"]',
-    extraWait: 2500,
+    extraWait: 1500,
   },
   {
     id: 'upyunso',
     label: 'UP云搜',
     buildUrl: (q) => `https://www.upyunso.com/search?q=${encodeURIComponent(q)}`,
     waitSelector: '[class*="result"], [class*="item"], [class*="card"]',
-    extraWait: 2500,
+    extraWait: 1500,
   },
   {
     id: 'alipansou',
     label: '阿里云盘搜',
     buildUrl: (q) => `https://www.alipansou.com/search?k=${encodeURIComponent(q)}`,
     waitSelector: '[class*="result"], [class*="item"], [class*="card"], .list',
-    extraWait: 2500,
+    extraWait: 1500,
   },
 ]
 
 // ─── 规则主体 ─────────────────────────────────────────────
 
-const PAGE_TIMEOUT = 15_000
+const PAGE_TIMEOUT = 8_000
 
 export const pansouRule: Rule = {
   name: '@seekall/rule-pansou',

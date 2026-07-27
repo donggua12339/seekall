@@ -62,10 +62,10 @@ const CATEGORY_LABELS: Record<string, string> = {
   general: '综合',
 }
 
-/** 各规则超时（ms）：greenhub 快，pansou 走无头浏览器较慢 */
+/** 各规则超时（ms）：greenhub 快，pansou 走无头浏览器较慢（封顶 30s 避免拖死整体） */
 const RULE_TIMEOUT: Record<string, number> = {
   greenhub: 20_000,
-  pansou: 60_000,
+  pansou: 30_000,
 }
 
 /** 规则包定义 */
