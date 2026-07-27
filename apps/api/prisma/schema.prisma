@@ -103,7 +103,7 @@ model User {
 
 model License {
   id           BigInt       @id @default(autoincrement()) @db.UnsignedBigInt
-  code         String       @unique @db.VarChar(32)
+  code         String       @unique @db.VarChar(64)
   tier         LicenseTier
   status       LicenseStatus @default(unused)
   generatedBy  BigInt?      @map("generated_by") @db.UnsignedBigInt
