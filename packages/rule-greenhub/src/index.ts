@@ -27,8 +27,8 @@ import { loadPool, ProxyPool, type ProxyEntry } from '@seekall/proxy-pool'
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
 
-/** 单源整体超时 ms（含直连 + 代理重试） */
-const SOURCE_TIMEOUT = 14_000
+/** 单源整体超时 ms（含直连 + 代理重试），硬上限，到点强制返回 */
+const SOURCE_TIMEOUT = 12_000
 /** 直连超时（短，失败尽快转代理） */
 const DIRECT_TIMEOUT = 4_000
 /** 单个代理尝试超时 */
@@ -61,6 +61,23 @@ const REQ_HEADERS = {
   'User-Agent': UA,
   Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
   'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+}
+
+/** 硬超时兜底：无论内部 promise 是否挂死（如 SOCKS 连接阶段 abort 不 settle），到点必返回 fallback。 */
+function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return new Promise<T>((resolve) => {
+    const timer = setTimeout(() => resolve(fallback), ms)
+    p.then(
+      (v) => {
+        clearTimeout(timer)
+        resolve(v)
+      },
+      () => {
+        clearTimeout(timer)
+        resolve(fallback)
+      },
+    )
+  })
 }
 
 /**
@@ -393,7 +410,10 @@ export const greenhubRule: Rule = {
       ctx.logger.warn('greenhub: 无可用代理池，仅直连')
     }
 
-    const tasks = SOURCES.map(async (source): Promise<Hit[]> => {
+    const tasks = SOURCES.map((source): Promise<Hit[]> => {
+      // 硬超时兜底：即使内部（如 SOCKS）挂死，到 SOURCE_TIMEOUT 也强制返回 []
+      return withTimeout(
+        (async (): Promise<Hit[]> => {
       // 每源独立 AbortController + 超时
       const ac = new AbortController()
       ctx.signal.addEventListener('abort', () => ac.abort(), { once: true })
@@ -420,6 +440,10 @@ export const greenhubRule: Rule = {
       } finally {
         clearTimeout(timer)
       }
+        })(),
+        SOURCE_TIMEOUT,
+        [] as Hit[],
+      )
     })
 
     const settled = await Promise.allSettled(tasks)
