@@ -55,8 +55,8 @@ export class ProxyPool {
   }
 
   private find(proxyUrl: string): ProxyEntry | undefined {
-    // proxyUrl 形如 http://host:port
-    const hp = proxyUrl.replace(/^https?:\/\//, '')
+    // 兼容 http:// / https:// / socks4:// / socks5:// / 裸 host:port
+    const hp = proxyUrl.replace(/^[a-z0-9]+:\/\//i, '')
     return this.byKey.get(hp)
   }
 

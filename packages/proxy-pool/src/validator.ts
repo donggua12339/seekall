@@ -1,4 +1,6 @@
 import { fetch, ProxyAgent } from 'undici'
+import { SocksProxyAgent } from 'socks-proxy-agent'
+import { request as httpRequest } from 'node:http'
 import type { ProxyEntry, ProxyRegion } from './types.js'
 
 // 可达性探针：用"能不能访问目标"反推出口区域，绕开限流的 geo-IP 服务。
@@ -31,7 +33,8 @@ interface ProbeResult {
   latencyMs: number
 }
 
-async function probe(
+// HTTP/HTTPS 代理探针（undici）
+async function probeHttp(
   dispatcher: ProxyAgent,
   target: string,
   timeoutMs: number,
@@ -53,36 +56,75 @@ async function probe(
   }
 }
 
+// SOCKS4/5 代理探针（node http + socks-proxy-agent）
+function probeSocks(
+  agent: SocksProxyAgent,
+  target: string,
+  timeoutMs: number,
+): Promise<ProbeResult> {
+  return new Promise((resolve) => {
+    const start = Date.now()
+    const req = httpRequest(
+      target,
+      { agent, headers: { 'User-Agent': UA }, timeout: timeoutMs },
+      (res) => {
+        const latencyMs = Date.now() - start
+        res.resume() // 排空 body
+        resolve({ ok: (res.statusCode || 0) > 0, latencyMs })
+      },
+    )
+    req.on('error', () => resolve({ ok: false, latencyMs: Date.now() - start }))
+    req.on('timeout', () => {
+      req.destroy()
+      resolve({ ok: false, latencyMs: Date.now() - start })
+    })
+    req.end()
+  })
+}
+
+/** 由两个探针结果判定出口区域。能访问 google = 海外；仅通百度 = 大陆。 */
+function classify(
+  cn: ProbeResult,
+  foreign: ProbeResult,
+): { region: ProxyRegion; latencyMs: number } | null {
+  if (foreign.ok) return { region: 'foreign', latencyMs: foreign.latencyMs }
+  if (cn.ok) return { region: 'cn', latencyMs: cn.latencyMs }
+  return null
+}
+
 /**
  * 验证单个代理：并行探测大陆/海外可达性，判定区域 + 延迟。
- * 两者都不通 → 返回 null（废代理）。
+ * 支持 http/https/socks4/socks5。两者都不通 → 返回 null（废代理）。
  */
 async function validateOne(
   entry: ProxyEntry,
   timeoutMs: number,
 ): Promise<ProxyEntry | null> {
+  const isSocks = entry.protocol === 'socks4' || entry.protocol === 'socks5'
+
+  if (isSocks) {
+    const scheme = entry.protocol === 'socks5' ? 'socks5' : 'socks4'
+    const agent = new SocksProxyAgent(`${scheme}://${entry.host}:${entry.port}`)
+    const [cn, foreign] = await Promise.all([
+      probeSocks(agent, CN_PROBE, timeoutMs),
+      probeSocks(agent, FOREIGN_PROBE, timeoutMs),
+    ])
+    const c = classify(cn, foreign)
+    if (!c) return null
+    return { ...entry, region: c.region, latencyMs: c.latencyMs, lastTested: Date.now(), fails: 0 }
+  }
+
+  // HTTP/HTTPS 代理
   const proxyUrl = `http://${entry.host}:${entry.port}`
   const dispatcher = new ProxyAgent({ uri: proxyUrl, connectTimeout: timeoutMs })
   try {
     const [cn, foreign] = await Promise.all([
-      probe(dispatcher, CN_PROBE, timeoutMs),
-      probe(dispatcher, FOREIGN_PROBE, timeoutMs),
+      probeHttp(dispatcher, CN_PROBE, timeoutMs),
+      probeHttp(dispatcher, FOREIGN_PROBE, timeoutMs),
     ])
-
-    let region: ProxyRegion
-    let latencyMs: number
-    if (foreign.ok) {
-      // 能访问 google = 非大陆出口（海外）
-      region = 'foreign'
-      latencyMs = foreign.latencyMs
-    } else if (cn.ok) {
-      region = 'cn'
-      latencyMs = cn.latencyMs
-    } else {
-      return null
-    }
-
-    return { ...entry, region, latencyMs, lastTested: Date.now(), fails: 0 }
+    const c = classify(cn, foreign)
+    if (!c) return null
+    return { ...entry, region: c.region, latencyMs: c.latencyMs, lastTested: Date.now(), fails: 0 }
   } finally {
     // close 也可能挂（活动 socket），加硬超时
     await withTimeout(dispatcher.close().catch(() => {}), 2000, undefined)

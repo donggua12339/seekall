@@ -202,7 +202,7 @@ export class LicenseService {
     }
 
     // 事务：更新 license 状态 + 更新 user + 记录 claim
-    return this.prisma.$transaction(async (tx) => {
+    const updatedUser = await this.prisma.$transaction(async (tx) => {
       await tx.license.update({
         where: { id: license.id },
         data: { status: 'used', usedBy: userId, usedAt: now },
@@ -219,6 +219,21 @@ export class LicenseService {
         },
       })
     })
+
+    // 返回前端期望的格式 { license, user }
+    const updatedLicense = await this.prisma.license.findUnique({
+      where: { id: license.id },
+    })
+
+    return {
+      license: updatedLicense,
+      user: {
+        id: updatedUser.id.toString(),
+        username: updatedUser.username,
+        isPaid: updatedUser.isPaid,
+        tier: updatedUser.tier,
+      },
+    }
   }
 
   /**

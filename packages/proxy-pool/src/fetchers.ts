@@ -25,11 +25,17 @@ async function fetchText(url: string, timeoutMs = 20_000): Promise<string> {
   return res.text()
 }
 
-function makeEntry(host: string, port: number, region: ProxyRegion, source: string): ProxyEntry {
+function makeEntry(
+  host: string,
+  port: number,
+  region: ProxyRegion,
+  source: string,
+  protocol: ProxyEntry['protocol'] = 'http',
+): ProxyEntry {
   return {
     host,
     port,
-    protocol: 'http',
+    protocol,
     region,
     source,
     latencyMs: 0,
@@ -43,6 +49,7 @@ interface RawSource {
   url: string
   region: ProxyRegion
   max: number
+  protocol?: ProxyEntry['protocol']
 }
 
 // 免费代理源清单。ProxyScrape 按国家拉取可直接打标；TheSpeedX/monosans 是大杂烩（unknown）。
@@ -83,6 +90,27 @@ const RAW_SOURCES: RawSource[] = [
     region: 'foreign',
     max: 80,
   },
+  // iplocate（每 30 分钟更新，verified）
+  {
+    name: 'iplocate-http',
+    url: 'https://raw.githubusercontent.com/iplocate/free-proxy-list/main/protocols/http.txt',
+    region: 'unknown',
+    max: 400,
+  },
+  {
+    name: 'iplocate-all',
+    url: 'https://raw.githubusercontent.com/iplocate/free-proxy-list/main/all-proxies.txt',
+    region: 'unknown',
+    max: 400,
+  },
+  // TheSpeedX SOCKS4（池子最大；socks 协议）
+  {
+    name: 'thespeedx-socks4',
+    url: 'https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/socks4.txt',
+    region: 'unknown',
+    max: 500,
+    protocol: 'socks4',
+  },
 ]
 
 /**
@@ -109,7 +137,7 @@ export async function fetchCandidates(
           const key = `${parsed.host}:${parsed.port}`
           if (seen.has(key)) continue
           seen.add(key)
-          out.push(makeEntry(parsed.host, parsed.port, src.region, src.name))
+          out.push(makeEntry(parsed.host, parsed.port, src.region, src.name, src.protocol || 'http'))
           count++
         }
         log(`[fetch] ${src.name}: ${count} 候选`)

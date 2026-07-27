@@ -10,5 +10,5 @@ export default defineConfig({
   sourcemap: true,
   splitting: false,
   shims: false,
-  external: ['@seekall/sdk', '@seekall/proxy-pool', 'undici'],
+  external: ['@seekall/sdk', '@seekall/proxy-pool', 'undici', 'socks-proxy-agent'],
 })
