@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import {
   NCard,
   NGrid,
@@ -12,17 +12,21 @@ import {
   NText,
 } from 'naive-ui'
 import { useAuthStore } from '@/stores/auth'
-import type { UserInfo } from '@/api/auth'
+import { authApi } from '@/api/auth'
 
 const auth = useAuthStore()
 const loading = ref(true)
-const userInfo = ref<UserInfo | null>(null)
+const freshUser = ref(auth.user)
 
+// 从后端拉最新用户信息（而不是只用 localStorage 缓存）
 async function loadUserInfo() {
   loading.value = true
   try {
-    // 刷新用户信息(从后端 /user/me 拿最新)
-    userInfo.value = auth.user
+    const me = await authApi.me()
+    freshUser.value = me
+    auth.setUser(me) // 同步更新 store + localStorage
+  } catch {
+    freshUser.value = auth.user // fallback 用缓存
   } finally {
     loading.value = false
   }
@@ -30,12 +34,32 @@ async function loadUserInfo() {
 
 onMounted(loadUserInfo)
 
+// 响应式：auth.user 变化时（如 redeem 后 setUser）自动同步
+const userInfo = computed(() => freshUser.value || auth.user)
+
+const statusLabel = (status?: string) => {
+  const map: Record<string, string> = {
+    active: '正常',
+    pending_verification: '待验证',
+    banned: '已封禁',
+    deleted: '已注销',
+  }
+  return map[status || ''] || status || 'unknown'
+}
+
 const tierLabel = (tier?: string | null) => {
   if (tier === 'trial') return '试用'
   if (tier === 'monthly') return '月度会员'
   if (tier === 'lifetime') return '终身会员'
   return '免费用户'
 }
+
+const paidUntilDisplay = computed(() => {
+  const u = userInfo.value
+  if (!u) return '-'
+  if (u.tier === 'lifetime') return '永久'
+  return u.paidUntil?.slice(0, 10) || '-'
+})
 
 const badgeLabel = (badge: string): string => {
   const map: Record<string, string> = {
@@ -65,7 +89,7 @@ const badgeTagType = (badge: string): 'success' | 'warning' | 'info' => {
                 :type="userInfo?.status === 'active' ? 'success' : 'warning'"
                 round
               >
-                {{ userInfo?.status || 'unknown' }}
+                {{ statusLabel(userInfo?.status) }}
               </NTag>
             </template>
           </NStatistic>
@@ -99,7 +123,7 @@ const badgeTagType = (badge: string): 'success' | 'warning' | 'info' => {
       </NGridItem>
       <NGridItem>
         <NCard>
-          <NStatistic label="到期时间" :value="userInfo?.paidUntil?.slice(0, 10) || '永久'" />
+          <NStatistic label="到期时间" :value="paidUntilDisplay" />
         </NCard>
       </NGridItem>
     </NGrid>

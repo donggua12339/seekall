@@ -20,8 +20,22 @@ export interface InviteTrialCode {
 }
 
 export interface RedeemRes {
-  license: License
-  user: { id: string; username: string; isPaid: boolean; tier: string }
+  license: {
+    id: string
+    code: string
+    tier: string
+    status: string
+    note: string | null
+    usedAt: string | null
+    createdAt: string
+  } | null
+  user: {
+    id: string
+    username: string
+    isPaid: boolean
+    tier: string
+    paidUntil: string | null
+  }
 }
 
 export const licenseApi = {

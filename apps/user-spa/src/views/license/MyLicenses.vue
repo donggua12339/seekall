@@ -19,10 +19,17 @@ import {
   useMessage,
 } from 'naive-ui'
 import { licenseApi, type InviteTrialCode } from '@/api/license'
+import { authApi } from '@/api/auth'
 import { useAuthStore } from '@/stores/auth'
 
 const message = useMessage()
 const auth = useAuthStore()
+
+const tierLabelMap: Record<string, string> = {
+  trial: '试用(7天)',
+  monthly: '月度会员(30天)',
+  lifetime: '终身会员',
+}
 
 const redeemLoading = ref(false)
 const redeemCode = ref('')
@@ -40,15 +47,22 @@ async function handleRedeem() {
   redeemLoading.value = true
   try {
     const res = await licenseApi.redeem(redeemCode.value)
-    message.success(`激活成功!会员档位: ${res.user.tier}`)
+    const tierCN = tierLabelMap[res.user.tier] || res.user.tier
+    message.success(`激活成功! 会员档位: ${tierCN}`)
     redeemCode.value = ''
-    // 刷新用户信息
-    if (auth.user) {
-      auth.setUser({
-        ...auth.user,
-        isPaid: res.user.isPaid,
-        tier: res.user.tier as 'trial' | 'monthly' | 'lifetime' | undefined,
-      })
+    // 重新拉 /user/me 获取完整最新状态（paidUntil / badge 等）
+    try {
+      const freshUser = await authApi.me()
+      auth.setUser(freshUser)
+    } catch {
+      // fallback: 局部更新
+      if (auth.user) {
+        auth.setUser({
+          ...auth.user,
+          isPaid: res.user.isPaid,
+          tier: res.user.tier as 'trial' | 'monthly' | 'lifetime' | undefined,
+        })
+      }
     }
   } catch (err) {
     message.error(err instanceof Error ? err.message : '激活失败')

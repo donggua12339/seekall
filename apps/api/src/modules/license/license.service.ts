@@ -221,17 +221,29 @@ export class LicenseService {
     })
 
     // 返回前端期望的格式 { license, user }
+    // 注意: Prisma 返回的 BigInt 字段不能直接 JSON 序列化，需手动 toString
     const updatedLicense = await this.prisma.license.findUnique({
       where: { id: license.id },
     })
 
     return {
-      license: updatedLicense,
+      license: updatedLicense
+        ? {
+            id: updatedLicense.id.toString(),
+            code: updatedLicense.code,
+            tier: updatedLicense.tier,
+            status: updatedLicense.status,
+            note: updatedLicense.note,
+            usedAt: updatedLicense.usedAt?.toISOString() ?? null,
+            createdAt: updatedLicense.createdAt.toISOString(),
+          }
+        : null,
       user: {
         id: updatedUser.id.toString(),
         username: updatedUser.username,
         isPaid: updatedUser.isPaid,
         tier: updatedUser.tier,
+        paidUntil: updatedUser.paidUntil?.toISOString() ?? null,
       },
     }
   }

@@ -168,6 +168,7 @@ describe('LicenseService', () => {
 
     it('trial 首次兑换应成功，paidUntil 为 7 天后', async () => {
       const sevenDaysLater = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+      const now = new Date()
       mockPrisma.license.findUnique
         .mockResolvedValueOnce({
           id: BigInt(1),
@@ -180,6 +181,9 @@ describe('LicenseService', () => {
           code: 'SA-TRY-XXXX',
           tier: 'trial',
           status: 'used',
+          note: null,
+          usedAt: now,
+          createdAt: now,
         })
       mockPrisma.user.findUnique.mockResolvedValue({ id: BigInt(1), isPaid: false })
       mockPrisma.licenseClaim.findFirst.mockResolvedValue(null)
@@ -203,6 +207,7 @@ describe('LicenseService', () => {
 
     it('monthly 兑换应 paidUntil 为 30 天后', async () => {
       const thirtyDaysLater = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+      const now = new Date()
       mockPrisma.license.findUnique
         .mockResolvedValueOnce({
           id: BigInt(1),
@@ -215,6 +220,9 @@ describe('LicenseService', () => {
           code: 'SA-MON-XXXX',
           tier: 'monthly',
           status: 'used',
+          note: null,
+          usedAt: now,
+          createdAt: now,
         })
       mockPrisma.user.findUnique.mockResolvedValue({ id: BigInt(1), isPaid: false })
       mockPrisma.license.update.mockResolvedValue({})
