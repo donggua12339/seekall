@@ -16,28 +16,108 @@
 
 import type { Rule, Hit, RuleContext } from '@seekall/sdk'
 import * as cheerio from 'cheerio'
+import { fetch as ufetch, ProxyAgent } from 'undici'
+import { loadPool, ProxyPool } from '@seekall/proxy-pool'
 
 // ─── 通用工具 ───────────────────────────────────────────────
 
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
 
-/** 单源超时 ms */
-const SOURCE_TIMEOUT = 10_000
+/** 单源整体超时 ms（含直连 + 代理重试） */
+const SOURCE_TIMEOUT = 20_000
+/** 直连超时（短，失败尽快转代理） */
+const DIRECT_TIMEOUT = 4_000
+/** 单个代理尝试超时 */
+const PROXY_TIMEOUT = 6_000
+/** 最多尝试几个代理 */
+const MAX_PROXY_ATTEMPTS = 3
+/** 代理池缓存 TTL（到期重读文件，拿到刷新后的代理） */
+const POOL_TTL = 5 * 60 * 1000
 
-async function fetchHtml(url: string, signal: AbortSignal): Promise<string> {
-  const res = await fetch(url, {
-    signal,
-    headers: {
-      'User-Agent': UA,
-      Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-      Referer: new URL(url).origin + '/',
-    },
-    redirect: 'follow',
-  })
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return res.text()
+// ─── 代理池（TTL 缓存，定期重读文件）─────────────────────────
+
+let cachedPool: ProxyPool | null = null
+let cachedAt = 0
+
+async function getFreshPool(): Promise<ProxyPool | null> {
+  if (cachedPool && Date.now() - cachedAt < POOL_TTL) return cachedPool
+  try {
+    const entries = await loadPool()
+    if (entries.length > 0) {
+      cachedPool = new ProxyPool(entries)
+      cachedAt = Date.now()
+    }
+    return cachedPool
+  } catch {
+    return cachedPool
+  }
+}
+
+const REQ_HEADERS = {
+  'User-Agent': UA,
+  Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+  'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+}
+
+/**
+ * 抓取 HTML：先直连（短超时），失败则走大陆代理故障转移。
+ * 用于救活从 HK 访问被墙/超时的国内源（如果核剥壳）。
+ */
+async function fetchHtml(
+  url: string,
+  outerSignal: AbortSignal,
+  pool: ProxyPool | null,
+  logger: RuleContext['logger'],
+  sourceId: string,
+): Promise<string> {
+  const headers = { ...REQ_HEADERS, Referer: new URL(url).origin + '/' }
+
+  // 1. 直连
+  try {
+    const res = await fetch(url, {
+      signal: AbortSignal.any([outerSignal, AbortSignal.timeout(DIRECT_TIMEOUT)]),
+      headers,
+      redirect: 'follow',
+    })
+    if (res.ok) return await res.text()
+    throw new Error(`HTTP ${res.status}`)
+  } catch (err) {
+    if (outerSignal.aborted) throw err
+    // 直连失败，落到代理
+  }
+
+  // 2. 大陆代理故障转移
+  if (pool) {
+    for (let i = 0; i < MAX_PROXY_ATTEMPTS; i++) {
+      if (outerSignal.aborted) break
+      const proxyUrl = pool.getProxyUrl('cn')
+      if (!proxyUrl) break
+      const dispatcher = new ProxyAgent({ uri: proxyUrl, connectTimeout: PROXY_TIMEOUT })
+      try {
+        const res = await ufetch(url, {
+          dispatcher,
+          signal: AbortSignal.any([outerSignal, AbortSignal.timeout(PROXY_TIMEOUT)]),
+          headers,
+          redirect: 'follow',
+        })
+        if (res.ok) {
+          pool.reportSuccess(proxyUrl)
+          logger.debug(`greenhub[${sourceId}]: 代理 ${proxyUrl} 救活`)
+          const text = await res.text()
+          await dispatcher.close().catch(() => {})
+          return text
+        }
+        throw new Error(`HTTP ${res.status}`)
+      } catch (err) {
+        pool.reportFailure(proxyUrl)
+        await dispatcher.close().catch(() => {})
+        if (outerSignal.aborted) throw err
+      }
+    }
+  }
+
+  throw new Error('直连与代理均失败')
 }
 
 function strip(html: string): string {
@@ -256,6 +336,14 @@ export const greenhubRule: Rule = {
   async run(query: string, ctx: RuleContext): Promise<Hit[]> {
     ctx.logger.info(`greenhub: 搜索 "${query}"，${SOURCES.length} 源并行`)
 
+    const pool = await getFreshPool()
+    if (pool) {
+      const s = pool.stats()
+      ctx.logger.info(`greenhub: 代理池 ${s.total} 个（大陆 ${s.cn} / 海外 ${s.foreign}）`)
+    } else {
+      ctx.logger.warn('greenhub: 无可用代理池，仅直连')
+    }
+
     const tasks = SOURCES.map(async (source): Promise<Hit[]> => {
       // 每源独立 AbortController + 超时
       const ac = new AbortController()
@@ -265,7 +353,7 @@ export const greenhubRule: Rule = {
       try {
         const url = source.buildUrl(query)
         ctx.logger.debug(`greenhub[${source.id}]: GET ${url}`)
-        const html = await fetchHtml(url, ac.signal)
+        const html = await fetchHtml(url, ac.signal, pool, ctx.logger, source.id)
         const hits = source.parse(html)
         // 填充 meta.category
         for (const h of hits) {

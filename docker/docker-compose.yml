@@ -17,6 +17,11 @@ services:
       - DATABASE_URL=mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE}
       - REDIS_URL=redis://redis:6379
       - MEILISEARCH_URL=http://meilisearch:7700
+      # greenhub 大陆代理故障转移用的代理池文件（refresh 定期更新）
+      - PROXY_POOL_FILE=/app/proxy-pool.json
+    volumes:
+      # 代理池 JSON（只读挂载；文件必须先存在，否则 docker 会建成目录）
+      - ../proxy-pool.json:/app/proxy-pool.json:ro
     healthcheck:
       # API 实际用 APP_PORT=7301（不是 compose 写的 PORT=3000），用 node http 模块测健康
       test: ['CMD', 'node', '-e', "require('http').get('http://localhost:7301/api/v1/health', r => process.exit(r.statusCode === 200 ? 0 : 1))"]

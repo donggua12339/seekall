@@ -20,6 +20,7 @@ RUN pnpm config set registry https://registry.npmmirror.com && \
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml* ./
 COPY apps/api/package.json ./apps/api/
 COPY packages/sdk/package.json ./packages/sdk/
+COPY packages/proxy-pool/package.json ./packages/proxy-pool/
 COPY packages/rule-greenhub/package.json ./packages/rule-greenhub/
 COPY packages/rule-pansou/package.json ./packages/rule-pansou/
 
@@ -48,6 +49,7 @@ RUN node node_modules/prisma/build/index.js generate --schema=apps/api/prisma/sc
 # ── 拷贝源码 ──
 COPY apps/api/ ./apps/api/
 COPY packages/sdk/ ./packages/sdk/
+COPY packages/proxy-pool/ ./packages/proxy-pool/
 COPY packages/rule-greenhub/ ./packages/rule-greenhub/
 COPY packages/rule-pansou/ ./packages/rule-pansou/
 
@@ -61,7 +63,8 @@ RUN pnpm --filter @seekall/rule-greenhub... build && \
   pnpm --filter @seekall/rule-pansou... build && \
   pnpm --filter @seekall/api build && \
   mkdir -p node_modules/@seekall && \
-  rm -rf node_modules/@seekall/rule-greenhub node_modules/@seekall/rule-pansou && \
+  rm -rf node_modules/@seekall/rule-greenhub node_modules/@seekall/rule-pansou node_modules/@seekall/proxy-pool && \
+  cp -r packages/proxy-pool node_modules/@seekall/proxy-pool && \
   cp -r packages/rule-greenhub node_modules/@seekall/rule-greenhub && \
   cp -r packages/rule-pansou node_modules/@seekall/rule-pansou
 

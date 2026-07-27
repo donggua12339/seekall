@@ -22,7 +22,9 @@
   },
   "dependencies": {
     "@seekall/sdk": "workspace:*",
-    "cheerio": "^1.0.0"
+    "@seekall/proxy-pool": "workspace:*",
+    "cheerio": "^1.0.0",
+    "undici": "^6.19.0"
   },
   "devDependencies": {
     "tsup": "^8.0.0",
