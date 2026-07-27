@@ -97,8 +97,10 @@ async function fetchHtml(
       const entry = pool.pick('cn')
       if (!entry) break
       const key = `${entry.host}:${entry.port}`
+      // 单次尝试信号：源级取消 + 单次超时，两者任一触发即中止
+      const attemptSignal = AbortSignal.any([outerSignal, AbortSignal.timeout(PROXY_TIMEOUT)])
       try {
-        const text = await fetchViaProxy(entry, url, headers, PROXY_TIMEOUT)
+        const text = await fetchViaProxy(entry, url, headers, attemptSignal)
         pool.reportSuccess(key)
         logger.debug(`greenhub[${sourceId}]: 代理 ${entry.protocol}://${key} 救活`)
         return text
@@ -117,22 +119,17 @@ async function fetchViaProxy(
   entry: ProxyEntry,
   url: string,
   headers: Record<string, string>,
-  timeoutMs: number,
+  signal: AbortSignal,
 ): Promise<string> {
   if (entry.protocol === 'socks4' || entry.protocol === 'socks5') {
-    return fetchViaSocks(entry, url, headers, timeoutMs)
+    return fetchViaSocks(entry, url, headers, signal)
   }
   const dispatcher = new ProxyAgent({
     uri: `http://${entry.host}:${entry.port}`,
-    connectTimeout: timeoutMs,
+    connectTimeout: PROXY_TIMEOUT,
   })
   try {
-    const res = await ufetch(url, {
-      dispatcher,
-      signal: AbortSignal.timeout(timeoutMs),
-      headers,
-      redirect: 'follow',
-    })
+    const res = await ufetch(url, { dispatcher, signal, headers, redirect: 'follow' })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     return await res.text()
   } finally {
@@ -145,13 +142,14 @@ function fetchViaSocks(
   entry: ProxyEntry,
   url: string,
   headers: Record<string, string>,
-  timeoutMs: number,
+  signal: AbortSignal,
 ): Promise<string> {
   return new Promise((resolve, reject) => {
+    if (signal.aborted) return reject(new Error('aborted'))
     const scheme = entry.protocol === 'socks5' ? 'socks5' : 'socks4'
     const agent = new SocksProxyAgent(`${scheme}://${entry.host}:${entry.port}`)
     const reqFn = url.startsWith('https') ? httpsRequest : httpRequest
-    const req = reqFn(url, { agent, headers, timeout: timeoutMs }, (res) => {
+    const req = reqFn(url, { agent, headers }, (res) => {
       const chunks: Buffer[] = []
       res.on('data', (c: Buffer) => chunks.push(c))
       res.on('end', () => {
@@ -160,11 +158,13 @@ function fetchViaSocks(
         else reject(new Error(`HTTP ${status}`))
       })
     })
-    req.on('error', reject)
-    req.on('timeout', () => {
+    const onAbort = () => {
       req.destroy()
-      reject(new Error('socks timeout'))
-    })
+      reject(new Error('aborted'))
+    }
+    signal.addEventListener('abort', onAbort, { once: true })
+    req.on('error', reject)
+    req.on('close', () => signal.removeEventListener('abort', onAbort))
     req.end()
   })
 }
