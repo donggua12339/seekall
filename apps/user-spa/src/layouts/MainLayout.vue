@@ -66,9 +66,10 @@ const tierLabel = computed(() => {
   return '免费'
 })
 
-const tierType = computed<'default' | 'success' | 'warning'>(() => {
-  if (auth.user?.isPaid) return 'success'
-  if (auth.user?.tier === 'trial') return 'warning'
+const tierType = computed<'default' | 'success' | 'info'>(() => {
+  if (auth.user?.tier === 'lifetime') return 'success'
+  if (auth.user?.tier === 'monthly') return 'success'
+  if (auth.user?.tier === 'trial') return 'info'
   return 'default'
 })
 </script>

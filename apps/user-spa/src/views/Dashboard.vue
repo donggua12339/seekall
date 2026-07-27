@@ -115,7 +115,7 @@ const badgeTagType = (badge: string): 'success' | 'warning' | 'info' => {
                 :type="userInfo?.isPaid ? 'success' : 'default'"
                 round
               >
-                {{ userInfo?.isPaid ? 'paid' : 'free' }}
+                {{ userInfo?.isPaid ? '已付费' : '免费' }}
               </NTag>
             </template>
           </NStatistic>
