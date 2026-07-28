@@ -3,6 +3,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger'
 import { Throttle } from '@nestjs/throttler'
 import { IsString, MinLength, MaxLength, IsOptional, IsIn } from 'class-validator'
 import { SearchService } from './search.service'
+import { CurrentUser } from '../../common/decorators/current-user.decorator'
 
 class SearchQueryDto {
   @IsString()
@@ -24,8 +25,8 @@ export class SearchController {
 
   @Get()
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
-  @ApiOperation({ summary: '全网资源聚合搜索（greenhub + 可选网盘搜索）' })
-  search(@Query() dto: SearchQueryDto) {
-    return this.searchService.search(dto.q, { pansou: dto.pansou === '1' })
+  @ApiOperation({ summary: '全网资源聚合搜索（底座 greenhub + 订阅/开关触发的可选规则）' })
+  search(@Query() dto: SearchQueryDto, @CurrentUser('sub') userId: string) {
+    return this.searchService.search(dto.q, { pansou: dto.pansou === '1' }, BigInt(userId))
   }
 }

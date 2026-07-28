@@ -1,4 +1,6 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
+import { PrismaService } from '../../database/prisma.service'
+import { RuleStatus } from '@prisma/client'
 
 /** 单条搜索结果 */
 export interface SearchHit {
@@ -75,6 +77,19 @@ const RULE_DEFS = {
 } as const
 
 /**
+ * npm 包名 → 引擎内置规则 key 的映射。
+ * 只有"已打进 API 镜像"的规则才能真正执行；市场里其它规则（未内置）订阅了也不会跑。
+ * greenhub 是底座（永远跑），pansou 等为订阅触发的可选规则。
+ */
+const PACKAGE_TO_RULE: Record<string, keyof typeof RULE_DEFS> = {
+  '@seekall/rule-greenhub': 'greenhub',
+  '@seekall/rule-pansou': 'pansou',
+}
+
+/** 底座规则：无论是否订阅都会执行 */
+const BASE_RULES: Array<keyof typeof RULE_DEFS> = ['greenhub']
+
+/**
  * 在 CJS 运行时加载 ESM 规则包。
  * TypeScript(module: commonjs)会把 `import()` 转译成 require()，对 ESM 包会失败；
  * 用 new Function 包一层，交给 Node 原生的动态 import()，从而真正按 ESM 加载。
@@ -87,6 +102,8 @@ const importEsm = new Function('specifier', 'return import(specifier)') as (
 export class SearchService {
   private readonly logger = new Logger(SearchService.name)
   private ruleCache = new Map<string, Promise<LoadedRule>>()
+
+  constructor(private readonly prisma: PrismaService) {}
 
   /** 懒加载 + 缓存单个规则模块 */
   private loadRule(key: keyof typeof RULE_DEFS): Promise<LoadedRule> {
@@ -141,15 +158,39 @@ export class SearchService {
     }
   }
 
-  async search(query: string, opts: SearchOptions = {}): Promise<SearchResult> {
+  /** 取用户已订阅、且引擎内置可执行的规则 key（订阅接通搜索的核心） */
+  private async subscribedRuleKeys(userId: bigint): Promise<Array<keyof typeof RULE_DEFS>> {
+    try {
+      const subs = await this.prisma.ruleSubscription.findMany({
+        where: { userId, rule: { status: RuleStatus.published } },
+        select: { rule: { select: { npmPackage: true } } },
+      })
+      const keys: Array<keyof typeof RULE_DEFS> = []
+      for (const s of subs) {
+        const key = PACKAGE_TO_RULE[s.rule.npmPackage]
+        if (key) keys.push(key)
+      }
+      return keys
+    } catch (err) {
+      this.logger.warn(`读取订阅规则失败: ${(err as Error).message}`)
+      return []
+    }
+  }
+
+  async search(query: string, opts: SearchOptions = {}, userId?: bigint): Promise<SearchResult> {
     const trimmed = query.trim()
     const start = Date.now()
 
-    // greenhub 必跑；pansou 按需（较慢，无头浏览器）
-    const keys: Array<keyof typeof RULE_DEFS> = ['greenhub']
-    if (opts.pansou) keys.push('pansou')
+    // 底座规则（greenhub）永远跑；可选规则由"订阅"或"显式开关"触发
+    const keys = new Set<keyof typeof RULE_DEFS>(BASE_RULES)
+    if (opts.pansou) keys.add('pansou')
 
-    const settled = await Promise.allSettled(keys.map((k) => this.runRule(k, trimmed)))
+    // 订阅接通：用户订阅的、且已内置进引擎的规则，加入本次搜索
+    if (userId !== undefined) {
+      for (const key of await this.subscribedRuleKeys(userId)) keys.add(key)
+    }
+
+    const settled = await Promise.allSettled([...keys].map((k) => this.runRule(k, trimmed)))
 
     const results: SearchHit[] = []
     for (const s of settled) {
@@ -191,7 +232,7 @@ export class SearchService {
     const sources = [...statMap.values()].sort((a, b) => b.count - a.count)
 
     this.logger.log(
-      `搜索 "${trimmed}"${opts.pansou ? ' [+网盘]' : ''}: ${deduped.length} 条 / ${sources.length} 源 / ${elapsedMs}ms`,
+      `搜索 "${trimmed}" [执行: ${[...keys].join('+')}]: ${deduped.length} 条 / ${sources.length} 源 / ${elapsedMs}ms`,
     )
 
     return {
