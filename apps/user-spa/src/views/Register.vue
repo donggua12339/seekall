@@ -46,9 +46,9 @@ async function handleSubmit() {
   }
   loading.value = true
   try {
-    await auth.register(form.username, form.email, form.password)
-    message.success('注册成功,已自动登录')
-    router.push('/dashboard')
+    const msg = await auth.register(form.username, form.email, form.password)
+    message.success(msg || '注册成功，请登录')
+    router.push('/login')
   } catch (err) {
     message.error(err instanceof Error ? err.message : '注册失败')
   } finally {

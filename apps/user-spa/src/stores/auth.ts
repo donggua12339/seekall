@@ -29,14 +29,10 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.setItem(USER_KEY, JSON.stringify(res.user))
   }
 
-  async function register(username: string, email: string, password: string) {
+  async function register(username: string, email: string, password: string): Promise<string> {
     const res = await authApi.register({ username, email, password, agreementVersion: '1.0.0' })
-    accessToken.value = res.accessToken
-    refreshToken.value = res.refreshToken
-    user.value = res.user
-    localStorage.setItem(ACCESS_TOKEN_KEY, res.accessToken)
-    localStorage.setItem(REFRESH_TOKEN_KEY, res.refreshToken)
-    localStorage.setItem(USER_KEY, JSON.stringify(res.user))
+    // 注册不自动登录（需要邮箱验证），返回成功消息
+    return res.message
   }
 
   function logout() {

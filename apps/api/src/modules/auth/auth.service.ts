@@ -33,23 +33,36 @@ export class AuthService {
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
   ) {}
 
-  async register(input: RegisterInput): Promise<{ message: string }> {
-    // v0.5：邀请码可选（半公开合规路线，不强制邀请）
-    // 保留字段是为兼容 v0.4 客户端，但服务端不再校验
-
+  async register(input: RegisterInput): Promise<{
+    code: number
+    data: { message: string }
+    message: string
+  }> {
     // 校验用户名/邮箱唯一性
+    // 特殊处理：如果已存在的用户是 pending_verification 状态（之前注册但邮件发送失败），
+    // 删除旧记录允许重新注册
     const existsUsername = await this.prisma.user.findUnique({
       where: { username: input.username },
     })
     if (existsUsername) {
-      throw new BusinessException(ErrorCode.USERNAME_EXISTS)
+      if (existsUsername.status === UserStatus.pending_verification) {
+        await this.prisma.user.delete({ where: { id: existsUsername.id } })
+        this.logger.log(`Deleted stale pending user: ${input.username}`)
+      } else {
+        throw new BusinessException(ErrorCode.USERNAME_EXISTS)
+      }
     }
 
     const existsEmail = await this.prisma.user.findUnique({
       where: { email: input.email },
     })
     if (existsEmail) {
-      throw new BusinessException(ErrorCode.EMAIL_EXISTS)
+      if (existsEmail.status === UserStatus.pending_verification) {
+        await this.prisma.user.delete({ where: { id: existsEmail.id } })
+        this.logger.log(`Deleted stale pending user by email: ${input.email}`)
+      } else {
+        throw new BusinessException(ErrorCode.EMAIL_EXISTS)
+      }
     }
 
     // 密码强度校验
@@ -72,11 +85,22 @@ export class AuthService {
       },
     })
 
-    // 发送验证邮件
-    await this.mailService.sendEmailVerification(user.email, verifyToken, user.username)
+    // 发送验证邮件（不阻断注册流程，失败只记日志）
+    try {
+      await this.mailService.sendEmailVerification(user.email, verifyToken, user.username)
+    } catch (err) {
+      this.logger.warn(`Verification email failed for ${user.email}: ${(err as Error).message}`)
+      // 邮件发送失败不影响注册成功，用户可以稍后重发验证邮件
+    }
 
     this.logger.log(`User registered: ${user.username} (${user.email})`)
-    return { message: '注册成功，请查收邮件完成验证' }
+
+    // 返回标准格式 { code, data, message }，匹配前端拦截器
+    return {
+      code: 0,
+      data: { message: '注册成功，请查收验证邮件' },
+      message: 'ok',
+    }
   }
 
   async login(

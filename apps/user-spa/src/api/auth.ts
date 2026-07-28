@@ -19,7 +19,9 @@ export interface LoginRes {
   user: UserInfo
 }
 
-export interface RegisterRes extends LoginRes {}
+export interface RegisterRes {
+  message: string
+}
 
 export const authApi = {
   login: (data: { username: string; password: string }) =>
