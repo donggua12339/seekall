@@ -40,6 +40,23 @@ export class MailService {
     }
   }
 
+  async sendEmailVerificationCode(email: string, code: string, username: string): Promise<void> {
+    const subject = '【觅源 SeekAll】邮箱验证码'
+    const html = `
+      <div style="font-family: -apple-system, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2>欢迎注册觅源 SeekAll</h2>
+        <p>你好，${username}：</p>
+        <p>你的邮箱验证码是：</p>
+        <p style="font-size: 36px; font-weight: 700; letter-spacing: 8px; color: #4f46e5; margin: 24px 0;">${code}</p>
+        <p>验证码 10 分钟内有效，请勿泄露给他人。</p>
+        <p>如非本人操作，请忽略此邮件。</p>
+        <hr>
+        <p style="color: #6b7280; font-size: 12px;">觅源 SeekAll - 中立的搜索规则引擎</p>
+      </div>
+    `
+    await this.send(email, subject, html)
+  }
+
   async sendEmailVerification(email: string, token: string, username: string): Promise<void> {
     const domain = this.configService.get<string>('APP_DOMAIN', 'localhost')
     const verifyUrl = `https://${domain}/auth/verify-email?token=${token}`

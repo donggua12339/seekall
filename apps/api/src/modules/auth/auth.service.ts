@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { ConfigService } from '@nestjs/config'
 import { Inject } from '@nestjs/common'
-import { createHash } from 'crypto'
+import { createHash, randomInt } from 'crypto'
 import { PrismaService } from '../../database/prisma.service'
 import { REDIS_CLIENT } from '../../database/redis.module'
 import { MailService } from '../mail/mail.service'
@@ -12,6 +12,9 @@ import { ErrorCode } from '../../common/constants/error-codes'
 import { JwtPayload } from '../../common/guards/jwt-auth.guard'
 import type Redis from 'ioredis'
 import { User, UserRole, UserStatus } from '@prisma/client'
+
+const EMAIL_VERIFY_CODE_PREFIX = 'email-verify-code:'
+const EMAIL_VERIFY_CODE_TTL = 600 // 10 分钟
 
 interface RegisterInput {
   username: string
@@ -70,9 +73,8 @@ export class AuthService {
       throw new BusinessException(ErrorCode.PASSWORD_TOO_WEAK)
     }
 
-    // 创建用户（pending_verification 状态）
+    // 创建用户（直接 active，邮箱验证为可选增强步骤）
     const passwordHash = await HashUtil.hash(input.password)
-    const verifyToken = await HashUtil.randomToken(32)
 
     const user = await this.prisma.user.create({
       data: {
@@ -80,25 +82,27 @@ export class AuthService {
         email: input.email,
         passwordHash,
         role: UserRole.user,
-        status: UserStatus.pending_verification,
-        emailVerifyToken: verifyToken,
+        status: UserStatus.active,
       },
     })
 
-    // 发送验证邮件（不阻断注册流程，失败只记日志）
+    // 发送验证邮件（不阻断注册，失败只记日志）
+    const verifyMode = await this.getEmailVerifyMode()
     try {
-      await this.mailService.sendEmailVerification(user.email, verifyToken, user.username)
+      if (verifyMode === 'code') {
+        await this.sendVerificationCode(user)
+      } else {
+        await this.sendVerificationLink(user)
+      }
     } catch (err) {
       this.logger.warn(`Verification email failed for ${user.email}: ${(err as Error).message}`)
-      // 邮件发送失败不影响注册成功，用户可以稍后重发验证邮件
     }
 
-    this.logger.log(`User registered: ${user.username} (${user.email})`)
+    this.logger.log(`User registered: ${user.username} (${user.email}), verifyMode=${verifyMode}`)
 
-    // 返回标准格式 { code, data, message }，匹配前端拦截器
     return {
       code: 0,
-      data: { message: '注册成功，请查收验证邮件' },
+      data: { message: '注册成功，请登录' },
       message: 'ok',
     }
   }
@@ -124,8 +128,13 @@ export class AuthService {
     if (user.status === UserStatus.deleted) {
       throw new BusinessException(ErrorCode.ACCOUNT_DELETED, 403)
     }
+    // pending_verification 兼容：自动转 active（邮箱验证变为可选增强步骤）
     if (user.status === UserStatus.pending_verification) {
-      throw new BusinessException(ErrorCode.EMAIL_NOT_VERIFIED, 403)
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { status: UserStatus.active },
+      })
+      this.logger.log(`Auto-activated pending user on login: ${user.username}`)
     }
 
     const valid = await HashUtil.verify(user.passwordHash, password)
@@ -319,5 +328,89 @@ export class AuthService {
 
   private validatePassword(password: string): boolean {
     return password.length >= 8 && /[a-zA-Z]/.test(password) && /\d/.test(password)
+  }
+
+  // ============ 邮箱验证双模式 ============
+
+  /** 读取验证模式配置（默认 'code'） */
+  private async getEmailVerifyMode(): Promise<'code' | 'link'> {
+    const config = await this.prisma.config.findUnique({
+      where: { key: 'email_verify_mode' },
+    })
+    return config?.value === 'link' ? 'link' : 'code'
+  }
+
+  /** 验证码模式：6 位数字存 Redis + 发邮件 */
+  private async sendVerificationCode(user: User): Promise<void> {
+    const code = String(randomInt(100000, 999999))
+    await this.redis.set(`${EMAIL_VERIFY_CODE_PREFIX}${user.id}`, code, 'EX', EMAIL_VERIFY_CODE_TTL)
+    await this.mailService.sendEmailVerificationCode(user.email, code, user.username)
+    this.logger.log(`Verification code sent to ${user.email}`)
+  }
+
+  /** 链接模式：token 存 DB + 发邮件 */
+  private async sendVerificationLink(user: User): Promise<void> {
+    const token = await HashUtil.randomToken(32)
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { emailVerifyToken: token },
+    })
+    await this.mailService.sendEmailVerification(user.email, token, user.username)
+    this.logger.log(`Verification link sent to ${user.email}`)
+  }
+
+  /** 验证码校验 */
+  async verifyEmailCode(userId: bigint, code: string): Promise<{ message: string }> {
+    const key = `${EMAIL_VERIFY_CODE_PREFIX}${userId}`
+    const stored = await this.redis.get(key)
+    if (!stored || stored !== code) {
+      throw new BusinessException(ErrorCode.EMAIL_VERIFY_TOKEN_INVALID)
+    }
+    await this.redis.del(key)
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { emailVerifiedAt: new Date() },
+    })
+    this.logger.log(`Email verified via code: userId=${userId}`)
+    return { message: '邮箱验证成功' }
+  }
+
+  /** 已登录用户重发验证邮件 */
+  async resendVerification(userId: bigint): Promise<{ message: string; mode: string }> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } })
+    if (!user) throw new BusinessException(ErrorCode.NOT_FOUND)
+    if (user.emailVerifiedAt) return { message: '邮箱已验证', mode: 'none' }
+
+    const mode = await this.getEmailVerifyMode()
+    if (mode === 'code') {
+      await this.sendVerificationCode(user)
+    } else {
+      await this.sendVerificationLink(user)
+    }
+    return { message: '验证邮件已重新发送', mode }
+  }
+
+  /** admin 获取/设置验证模式 */
+  async getEmailVerifyModePublic(): Promise<{ mode: string }> {
+    return { mode: await this.getEmailVerifyMode() }
+  }
+
+  async setEmailVerifyMode(mode: 'code' | 'link', adminId: bigint): Promise<{ mode: string }> {
+    await this.prisma.config.upsert({
+      where: { key: 'email_verify_mode' },
+      create: { key: 'email_verify_mode', value: mode },
+      update: { value: mode },
+    })
+    await this.prisma.adminAuditLog.create({
+      data: {
+        adminId,
+        action: 'set_email_verify_mode',
+        targetType: 'config',
+        targetId: null,
+        detail: { mode },
+      },
+    })
+    this.logger.log(`Email verify mode changed to ${mode} by admin ${adminId}`)
+    return { mode }
   }
 }

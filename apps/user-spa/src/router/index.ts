@@ -15,6 +15,12 @@ const routes: RouteRecordRaw[] = [
     meta: { public: true, title: '注册' },
   },
   {
+    path: '/verify-email',
+    name: 'verify-email',
+    component: () => import('@/views/VerifyEmail.vue'),
+    meta: { title: '邮箱验证' },
+  },
+  {
     path: '/',
     component: () => import('@/layouts/MainLayout.vue'),
     redirect: '/search',

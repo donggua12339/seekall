@@ -37,6 +37,10 @@ class ReportDeadDto {
   @IsOptional() @IsString() note?: string
 }
 
+class SetEmailVerifyModeDto {
+  @IsString() mode!: string
+}
+
 @ApiTags('后台管理（super_admin）')
 @ApiBearerAuth()
 @Roles('super_admin')
@@ -124,6 +128,18 @@ export class AdminController {
     @Body() dto: ReviewRefundDto,
   ) {
     return this.service.reviewRefund(BigInt(id), 'reject', BigInt(adminId), dto.note)
+  }
+
+  @Get('settings/email-verify-mode')
+  @ApiOperation({ summary: '获取邮箱验证模式' })
+  getEmailVerifyMode() {
+    return this.service.getEmailVerifyMode()
+  }
+
+  @Patch('settings/email-verify-mode')
+  @ApiOperation({ summary: '设置邮箱验证模式（code=验证码 / link=验证链接）' })
+  setEmailVerifyMode(@Body() dto: SetEmailVerifyModeDto, @CurrentUser('sub') adminId: string) {
+    return this.service.setEmailVerifyMode(dto.mode as 'code' | 'link', BigInt(adminId))
   }
 }
 

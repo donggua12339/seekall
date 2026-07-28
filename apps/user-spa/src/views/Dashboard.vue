@@ -10,6 +10,7 @@ import {
   NButton,
   NSpace,
   NText,
+  NAlert,
 } from 'naive-ui'
 import { useAuthStore } from '@/stores/auth'
 import { authApi } from '@/api/auth'
@@ -79,6 +80,18 @@ const badgeTagType = (badge: string): 'success' | 'warning' | 'info' => {
 
 <template>
   <NSpin :show="loading">
+    <NAlert
+      v-if="userInfo && !userInfo.emailVerifiedAt"
+      type="warning"
+      closable
+      style="margin-bottom: 16px"
+    >
+      <template #header>邮箱未验证</template>
+      你的邮箱尚未验证。验证后可获得更多信任标识。
+      <NButton text type="primary" size="small" @click="$router.push('/verify-email')" style="margin-left: 8px">
+        立即验证
+      </NButton>
+    </NAlert>
     <NGrid :cols="4" :x-gap="16" :y-gap="16">
       <NGridItem>
         <NCard>

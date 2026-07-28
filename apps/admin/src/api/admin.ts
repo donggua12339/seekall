@@ -101,4 +101,8 @@ export const adminApi = {
     http.post<unknown, RefundRequest>(`/admin/refunds/${id}/approve`, { note }),
   rejectRefund: (id: string, note?: string) =>
     http.post<unknown, RefundRequest>(`/admin/refunds/${id}/reject`, { note }),
+  getEmailVerifyMode: () =>
+    http.get<unknown, { mode: string }>('/admin/settings/email-verify-mode'),
+  setEmailVerifyMode: (mode: string) =>
+    http.patch<unknown, { mode: string }>('/admin/settings/email-verify-mode', { mode }),
 }

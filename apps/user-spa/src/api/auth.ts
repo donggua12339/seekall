@@ -10,6 +10,7 @@ export interface UserInfo {
   tier?: 'trial' | 'monthly' | 'lifetime' | null
   status: 'pending_verification' | 'active' | 'banned' | 'deleted'
   badge?: 'contributor' | 'reviewer' | 'early_adopter' | null
+  emailVerifiedAt?: string | null
   createdAt: string
 }
 
@@ -34,4 +35,9 @@ export const authApi = {
     http.post('/auth/password-reset/request', { email }),
   resetPassword: (token: string, newPassword: string) =>
     http.post('/auth/password-reset/confirm', { token, newPassword }),
+  getVerifyMode: () => http.get<unknown, { mode: 'code' | 'link' }>('/auth/verify-mode'),
+  verifyEmailCode: (code: string) =>
+    http.post<unknown, { message: string }>('/auth/verify-email-code', { code }),
+  resendVerification: () =>
+    http.post<unknown, { message: string; mode: string }>('/auth/resend-verification'),
 }

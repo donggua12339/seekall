@@ -335,4 +335,34 @@ export class AdminService {
       note: '透明度报告每月 1 号自动发布到 GitHub',
     }
   }
+
+  // ============ 邮箱验证模式设置 ============
+
+  async getEmailVerifyMode(): Promise<{ mode: string }> {
+    const config = await this.prisma.config.findUnique({
+      where: { key: 'email_verify_mode' },
+    })
+    return { mode: config?.value === 'link' ? 'link' : 'code' }
+  }
+
+  async setEmailVerifyMode(mode: 'code' | 'link', adminId: bigint): Promise<{ mode: string }> {
+    if (mode !== 'code' && mode !== 'link') {
+      throw new Error('mode must be "code" or "link"')
+    }
+    await this.prisma.config.upsert({
+      where: { key: 'email_verify_mode' },
+      create: { key: 'email_verify_mode', value: mode },
+      update: { value: mode },
+    })
+    await this.prisma.adminAuditLog.create({
+      data: {
+        adminId,
+        action: 'set_email_verify_mode',
+        targetType: 'config',
+        targetId: null,
+        detail: { mode },
+      },
+    })
+    return { mode }
+  }
 }

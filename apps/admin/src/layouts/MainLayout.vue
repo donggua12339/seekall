@@ -26,6 +26,7 @@ const menuOptions = computed<MenuOption[]>(() => [
   { label: '退款审核', key: 'refunds', icon: renderIcon('💰') },
   { label: '用户管理', key: 'users', icon: renderIcon('👤') },
   { label: '审计日志', key: 'audit-logs', icon: renderIcon('📜') },
+  { label: '系统设置', key: 'settings', icon: renderIcon('⚙️') },
 ])
 
 const activeKey = computed(() => {

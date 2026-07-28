@@ -1,8 +1,10 @@
-import { Body, Controller, Post, HttpCode, HttpStatus } from '@nestjs/common'
-import { ApiTags, ApiOperation } from '@nestjs/swagger'
+import { Body, Controller, Get, Post, HttpCode, HttpStatus } from '@nestjs/common'
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger'
 import { Throttle } from '@nestjs/throttler'
+import { IsString, Length } from 'class-validator'
 import { AuthService } from './auth.service'
 import { Public } from '../../common/decorators/public.decorator'
+import { CurrentUser } from '../../common/decorators/current-user.decorator'
 import {
   RegisterDto,
   LoginDto,
@@ -11,6 +13,12 @@ import {
   ResetPasswordDto,
   RefreshTokenDto,
 } from './dto'
+
+class VerifyEmailCodeDto {
+  @IsString()
+  @Length(6, 6, { message: '验证码为 6 位数字' })
+  code!: string
+}
 
 @ApiTags('认证')
 @Controller('auth')
@@ -67,5 +75,30 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   refresh(@Body() dto: RefreshTokenDto) {
     return this.authService.refresh(dto.refreshToken)
+  }
+
+  @Public()
+  @Get('verify-mode')
+  @ApiOperation({ summary: '查询当前邮箱验证模式（code/link）' })
+  getVerifyMode() {
+    return this.authService.getEmailVerifyModePublic()
+  }
+
+  @ApiBearerAuth()
+  @Post('verify-email-code')
+  @ApiOperation({ summary: '验证码模式：校验 6 位验证码' })
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
+  verifyEmailCode(@Body() dto: VerifyEmailCodeDto, @CurrentUser('sub') userId: string) {
+    return this.authService.verifyEmailCode(BigInt(userId), dto.code)
+  }
+
+  @ApiBearerAuth()
+  @Post('resend-verification')
+  @ApiOperation({ summary: '重发验证邮件' })
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { ttl: 60_000, limit: 3 } })
+  resendVerification(@CurrentUser('sub') userId: string) {
+    return this.authService.resendVerification(BigInt(userId))
   }
 }
