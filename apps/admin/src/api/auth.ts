@@ -20,6 +20,6 @@ export interface LoginRes {
 export const authApi = {
   login: (data: { username: string; password: string }) =>
     http.post<unknown, LoginRes>('/auth/login', data),
-  me: () => http.post<unknown, UserInfo>('/auth/me'),
+  me: () => http.get<unknown, UserInfo>('/user/me'),
   logout: () => http.post('/auth/logout'),
 }
