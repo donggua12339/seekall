@@ -10,22 +10,20 @@ export class AdminService {
   constructor(private readonly prisma: PrismaService) {}
 
   async dashboard() {
-    const [userCount, paidUserCount, activeUserCount, licenseCount] = await Promise.all([
-      this.prisma.user.count({ where: { deletedAt: null } }).catch(() => 0),
-      this.prisma.user.count({ where: { isPaid: true, deletedAt: null } }).catch(() => 0),
-      this.prisma.user.count({ where: { status: 'active', deletedAt: null } }).catch(() => 0),
+    const [userCount, paidUserCount, licenseCount, ruleCount] = await Promise.all([
+      this.prisma.user.count({ where: { status: { not: 'deleted' } } }).catch(() => 0),
+      this.prisma.user
+        .count({ where: { isPaid: true, status: { not: 'deleted' } } })
+        .catch(() => 0),
       this.prisma.license.count().catch(() => 0),
+      this.prisma.rule.count({ where: { status: 'published' } }).catch(() => 0),
     ])
 
     return {
-      users: {
-        total: userCount,
-        paid: paidUserCount,
-        active: activeUserCount,
-      },
-      licenses: {
-        total: licenseCount,
-      },
+      userCount,
+      paidUserCount,
+      licenseCount,
+      ruleCount,
     }
   }
 

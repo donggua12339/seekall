@@ -26,6 +26,7 @@ export interface Dashboard {
   userCount: number
   paidUserCount: number
   licenseCount: number
+  ruleCount: number
 }
 
 export interface AuditLog {

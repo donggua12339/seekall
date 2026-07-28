@@ -62,12 +62,6 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '退款审核' },
       },
       {
-        path: 'analytics',
-        name: 'analytics',
-        component: () => import('@/views/Analytics.vue'),
-        meta: { title: '数据分析' },
-      },
-      {
         path: 'settings',
         name: 'settings',
         component: () => import('@/views/Settings.vue'),
@@ -100,10 +94,6 @@ router.beforeEach((to, _from, next) => {
   }
   if (!auth.isLoggedIn) {
     next({ name: 'login', query: { redirect: to.fullPath } })
-    return
-  }
-  if (!auth.isSuperAdmin && to.name !== 'dashboard') {
-    next('/dashboard')
     return
   }
   next()
