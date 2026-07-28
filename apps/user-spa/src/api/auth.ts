@@ -24,7 +24,7 @@ export interface RegisterRes extends LoginRes {}
 export const authApi = {
   login: (data: { username: string; password: string }) =>
     http.post<unknown, LoginRes>('/auth/login', data),
-  register: (data: { username: string; email: string; password: string }) =>
+  register: (data: { username: string; email: string; password: string; agreementVersion: string }) =>
     http.post<unknown, RegisterRes>('/auth/register', data),
   me: () => http.get<unknown, UserInfo>('/user/me'),
   logout: () => http.post('/auth/logout'),

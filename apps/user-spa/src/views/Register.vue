@@ -10,6 +10,7 @@ import {
   NButton,
   NSpace,
   NText,
+  NCheckbox,
   useMessage,
 } from 'naive-ui'
 
@@ -23,6 +24,7 @@ const form = reactive({
   password: '',
   confirmPassword: '',
 })
+const agreedTerms = ref(false)
 const loading = ref(false)
 
 async function handleSubmit() {
@@ -36,6 +38,10 @@ async function handleSubmit() {
   }
   if (form.password.length < 8) {
     message.error('密码至少 8 位')
+    return
+  }
+  if (!agreedTerms.value) {
+    message.warning('请先同意用户协议')
     return
   }
   loading.value = true
@@ -78,7 +84,15 @@ async function handleSubmit() {
           />
         </NFormItem>
         <NSpace vertical>
-          <NButton type="primary" block :loading="loading" @click="handleSubmit">
+          <NCheckbox v-model:checked="agreedTerms">
+            <NText depth="2" style="font-size: 13px;">
+              我已阅读并同意
+              <NButton text type="primary" tag="a" href="https://seekall.winmelon.cn/compliance/" target="_blank">
+                用户协议
+              </NButton>
+            </NText>
+          </NCheckbox>
+          <NButton type="primary" block :loading="loading" :disabled="!agreedTerms" @click="handleSubmit">
             注册
           </NButton>
           <NText depth="3" style="font-size: 13px;">
