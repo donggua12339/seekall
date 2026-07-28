@@ -7,7 +7,7 @@
  * 原理：这些站搜索结果是 JS 动态渲染的，普通 fetch 拿不到。
  * 用 puppeteer-core 启动无头浏览器，渲染页面后提取搜索结果。
  * 每次搜索临时 launch 浏览器、结束即 close（4GB 服务器避免常驻吃内存）；
- * 单次搜索内串行访问各源，避免多 page 并发 OOM。
+ * 多源并行渲染（Promise.allSettled），单源失败不阻塞其它源。
  */
 
 import type { Rule, Hit, RuleContext } from '@seekall/sdk'
@@ -149,7 +149,7 @@ export const pansouRule: Rule = {
   description: '网盘资源搜索（无头浏览器渲染 CSR 网盘搜索站）',
 
   async run(query: string, ctx: RuleContext): Promise<Hit[]> {
-    ctx.logger.info(`pansou: 搜索 "${query}"，${PAN_SOURCES.length} 源串行渲染`)
+    ctx.logger.info(`pansou: 搜索 "${query}"，${PAN_SOURCES.length} 源并行渲染`)
 
     let browser: Browser
     try {
@@ -160,88 +160,88 @@ export const pansouRule: Rule = {
       return []
     }
 
-    const allHits: Hit[] = []
-
-    try {
-      for (const source of PAN_SOURCES) {
-        if (ctx.signal.aborted) break
-
-        let page: Page | null = null
-        try {
-          page = await browser.newPage()
-          await page.setUserAgent(
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-          )
-          await page.setViewport({ width: 1280, height: 800 })
-
-          const url = source.buildUrl(query)
-          ctx.logger.debug(`pansou[${source.id}]: goto ${url}`)
-
-          await page.goto(url, {
-            waitUntil: 'domcontentloaded',
-            timeout: PAGE_TIMEOUT,
-          })
-
-          try {
-            await page.waitForSelector(source.waitSelector, { timeout: 8000 })
-          } catch {
-            // 选择器超时不一定代表没结果，继续提取
-          }
-
-          if (source.extraWait) {
-            await new Promise((r) => setTimeout(r, source.extraWait))
-          }
-
-          const raw = (await page.evaluate(EXTRACT_FN)) as Array<{
-            title: string
-            url: string
-            snippet: string
-          }>
-
-          const hits: Hit[] = raw.map((r) => ({
-            title: r.title,
-            url: r.url,
-            snippet: r.snippet || undefined,
-            source: source.label,
-            meta: { category: 'pan' as const, panSource: source.id },
-          }))
-
-          ctx.logger.debug(`pansou[${source.id}]: ${hits.length} 条`)
-          allHits.push(...hits)
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err)
-          if (!msg.includes('aborted')) {
-            ctx.logger.warn(`pansou[${source.id}] 失败: ${msg}`)
-          }
-        } finally {
-          if (page) {
-            try {
-              await page.close()
-            } catch {
-              /* ignore */
-            }
-          }
-        }
-      }
-    } finally {
+    /** 单个源的搜索逻辑 */
+    const searchSource = async (source: PanSource): Promise<Hit[]> => {
+      if (ctx.signal.aborted) return []
+      let page: Page | null = null
       try {
-        await browser.close()
-      } catch {
-        /* ignore */
+        page = await browser.newPage()
+        await page.setUserAgent(
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+        )
+        await page.setViewport({ width: 1280, height: 800 })
+
+        const url = source.buildUrl(query)
+        ctx.logger.debug(`pansou[${source.id}]: goto ${url}`)
+
+        await page.goto(url, {
+          waitUntil: 'domcontentloaded',
+          timeout: PAGE_TIMEOUT,
+        })
+
+        try {
+          await page.waitForSelector(source.waitSelector, { timeout: 5000 })
+        } catch {
+          // 选择器超时不一定代表没结果，继续提取
+        }
+
+        if (source.extraWait) {
+          await new Promise((r) => setTimeout(r, source.extraWait))
+        }
+
+        const raw = (await page.evaluate(EXTRACT_FN)) as Array<{
+          title: string
+          url: string
+          snippet: string
+        }>
+
+        const hits: Hit[] = raw.map((r) => ({
+          title: r.title,
+          url: r.url,
+          snippet: r.snippet || undefined,
+          source: source.label,
+          meta: { category: 'pan' as const, panSource: source.id },
+        }))
+
+        ctx.logger.debug(`pansou[${source.id}]: ${hits.length} 条`)
+        return hits
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        if (!msg.includes('aborted')) {
+          ctx.logger.warn(`pansou[${source.id}] 失败: ${msg}`)
+        }
+        return []
+      } finally {
+        if (page) {
+          try { await page.close() } catch { /* ignore */ }
+        }
       }
     }
 
-    // 去重
-    const seen = new Set<string>()
-    const deduped = allHits.filter((h) => {
-      const key = h.url.replace(/\/$/, '')
-      if (seen.has(key)) return false
-      seen.add(key)
-      return true
-    })
+    try {
+      // 并行跑所有源
+      const settled = await Promise.allSettled(
+        PAN_SOURCES.map((s) => searchSource(s)),
+      )
+      const allHits: Hit[] = []
+      for (const s of settled) {
+        if (s.status === 'fulfilled') allHits.push(...s.value)
+      }
 
-    ctx.logger.info(`pansou: 共 ${deduped.length} 条去重结果`)
-    return deduped
+      // 去重
+      const seen = new Set<string>()
+      const deduped = allHits.filter((h) => {
+        const key = h.url.replace(/\/$/, '')
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      })
+
+      ctx.logger.info(`pansou: 共 ${deduped.length} 条去重结果`)
+      return deduped
+    } finally {
+      try { await browser.close() } catch { /* ignore */ }
+    }
   },
 }
 

@@ -21,16 +21,16 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '邮箱验证' },
   },
   {
+    path: '/search',
+    name: 'search',
+    component: () => import('@/views/Search.vue'),
+    meta: { public: true, title: '资源搜索' },
+  },
+  {
     path: '/',
     component: () => import('@/layouts/MainLayout.vue'),
-    redirect: '/search',
+    redirect: '/dashboard',
     children: [
-      {
-        path: 'search',
-        name: 'search',
-        component: () => import('@/views/Search.vue'),
-        meta: { title: '资源搜索' },
-      },
       {
         path: 'dashboard',
         name: 'dashboard',

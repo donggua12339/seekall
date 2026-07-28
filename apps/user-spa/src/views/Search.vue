@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { NButton, NHighlight, NSkeleton, NEmpty, NCheckbox } from 'naive-ui'
+import { NButton, NHighlight, NSkeleton, NEmpty } from 'naive-ui'
 import { useMessage } from 'naive-ui'
 import { searchApi, type SearchResult, type SearchHit } from '@/api/search'
 import { useAppStore } from '@/stores/app'
+import { useAuthStore } from '@/stores/auth'
+import { useRouter } from 'vue-router'
 
 const app = useAppStore()
+const auth = useAuthStore()
+const router = useRouter()
 const message = useMessage()
 
 type State = 'idle' | 'loading' | 'done' | 'error'
@@ -15,9 +19,12 @@ const result = ref<SearchResult | null>(null)
 const errorMsg = ref('')
 const activeSource = ref<string>('') // 域名过滤
 const activeCategory = ref<string>('all')
-const includePan = ref(false) // 是否附加网盘搜索（无头浏览器，较慢）
 
-const HOT_SEARCHES = ['Photoshop', 'Everything', 'Office 2024', '剪映', 'ATRI', '间谍过家家']
+const HOT_SEARCHES = [
+  'Photoshop', 'WPS', 'Office 2024', '剪映',
+  '考研资料', '四级', '我的世界', '间谍过家家',
+  'ATRI', '小说合集', '电子书', 'Python教程',
+]
 
 const CATEGORY_META: Record<string, { label: string; color: string }> = {
   software: { label: '软件', color: '#0e9f6e' },
@@ -40,7 +47,7 @@ async function doSearch(raw?: string, presetCategory?: string) {
   activeCategory.value = presetCategory ?? 'all'
   errorMsg.value = ''
   try {
-    result.value = await searchApi.search(q, { pansou: includePan.value })
+    result.value = await searchApi.search(q)
     state.value = 'done'
   } catch (err) {
     errorMsg.value = (err as Error).message || '搜索失败'
@@ -62,8 +69,6 @@ const CATEGORY_DEFAULT_Q: Record<string, string> = {
   pan: '资源',
 }
 function pickCategory(cat: string) {
-  // 点"网盘"卡片自动开启网盘搜索
-  if (cat === 'pan') includePan.value = true
   doSearch(CATEGORY_DEFAULT_Q[cat] || cat, cat)
 }
 
@@ -132,7 +137,34 @@ function openUrl(url: string) {
   <div class="search-root" :class="{ dark: app.darkMode }">
     <div class="bg-layer" aria-hidden="true" />
 
-    <!-- ── 顶部：品牌 + 搜索框 ── -->
+    <!-- ── 顶部导航 ── -->
+    <nav class="top-nav">
+      <div class="nav-left">
+        <button class="nav-btn" @click="router.push('/dashboard')">
+          用户中心
+        </button>
+      </div>
+      <div class="nav-right">
+        <button class="nav-btn" @click="app.toggleDark()">
+          {{ app.darkMode ? '☀️' : '🌙' }}
+        </button>
+        <template v-if="auth.isLoggedIn">
+          <button class="nav-btn" @click="router.push('/dashboard')">
+            {{ auth.user?.username || '我的' }}
+          </button>
+        </template>
+        <template v-else>
+          <button class="nav-btn nav-btn-primary" @click="router.push('/login')">
+            登录
+          </button>
+          <button class="nav-btn" @click="router.push('/register')">
+            注册
+          </button>
+        </template>
+      </div>
+    </nav>
+
+    <!-- ── 品牌 + 搜索框 ── -->
     <header class="hero" :class="{ compact: state === 'done' || state === 'loading' || state === 'error' }">
       <div class="wordmark">
         <span class="radar" aria-hidden="true"><i /><i /><i /></span>
@@ -160,13 +192,6 @@ function openUrl(url: string) {
         </button>
       </div>
 
-      <div class="pan-toggle">
-        <NCheckbox v-model:checked="includePan">
-          <span class="pan-toggle-label">含网盘搜索</span>
-        </NCheckbox>
-        <span class="pan-toggle-hint">无头浏览器实时抓取夸克/阿里云盘等，约 30s</span>
-      </div>
-
       <!-- 初始态：热门搜索 -->
       <div v-if="state === 'idle'" class="hot">
         <span class="hot-label">试试：</span>
@@ -182,7 +207,7 @@ function openUrl(url: string) {
       <div v-if="state === 'loading'" class="loading">
         <div class="loading-status">
           <span class="dot-pulse"><i /><i /><i /></span>
-          正在并行检索 11 个资源站…
+          正在并行检索 14+ 个资源站…
         </div>
         <div v-for="n in 6" :key="n" class="skeleton-card">
           <NSkeleton height="20px" width="60%" />
@@ -333,6 +358,52 @@ function openUrl(url: string) {
   --card-hover: #16241d;
   --green: #10b981;
   --green-deep: #34d399;
+}
+/* ── 顶部导航 ── */
+.top-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 20px;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--line);
+}
+.search-root.dark .top-nav {
+  background: rgba(13, 21, 18, 0.85);
+}
+.nav-left, .nav-right {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.nav-btn {
+  padding: 6px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--text-soft);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.nav-btn:hover {
+  border-color: var(--green);
+  color: var(--green);
+}
+.nav-btn-primary {
+  background: var(--green);
+  color: #fff;
+  border-color: var(--green);
+}
+.nav-btn-primary:hover {
+  opacity: 0.9;
+  color: #fff;
 }
 .bg-layer {
   position: absolute;

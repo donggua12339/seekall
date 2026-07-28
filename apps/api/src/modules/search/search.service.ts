@@ -64,10 +64,10 @@ const CATEGORY_LABELS: Record<string, string> = {
   general: '综合',
 }
 
-/** 各规则超时（ms）：greenhub 快，pansou 走无头浏览器较慢（封顶 30s 避免拖死整体） */
+/** 各规则超时（ms）：greenhub 快，pansou 并行后降到 15s */
 const RULE_TIMEOUT: Record<string, number> = {
   greenhub: 20_000,
-  pansou: 30_000,
+  pansou: 15_000,
 }
 
 /** 规则包定义 */
@@ -86,8 +86,8 @@ const PACKAGE_TO_RULE: Record<string, keyof typeof RULE_DEFS> = {
   '@seekall/rule-pansou': 'pansou',
 }
 
-/** 底座规则：无论是否订阅都会执行 */
-const BASE_RULES: Array<keyof typeof RULE_DEFS> = ['greenhub']
+/** 底座规则：无论是否订阅都会执行（greenhub + pansou 默认都跑） */
+const BASE_RULES: Array<keyof typeof RULE_DEFS> = ['greenhub', 'pansou']
 
 /**
  * 在 CJS 运行时加载 ESM 规则包。

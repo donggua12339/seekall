@@ -25,10 +25,22 @@ export class JwtAuthGuard implements CanActivate {
       context.getHandler(),
       context.getClass(),
     ])
-    if (isPublic) return true
-
     const request = context.switchToHttp().getRequest<FastifyRequest>()
     const token = this.extractToken(request)
+
+    if (isPublic) {
+      // 软认证：public 路由如果有合法 token 也解析，让 @CurrentUser 能拿到 userId
+      if (token) {
+        try {
+          const payload = await this.jwtService.verifyAsync<JwtPayload>(token)
+          ;(request as unknown as { user: JwtPayload }).user = payload
+        } catch {
+          // token 无效不报错，当未登录处理
+        }
+      }
+      return true
+    }
+
     if (!token) {
       throw new UnauthorizedException()
     }
