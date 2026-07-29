@@ -128,13 +128,11 @@
 
 ### 搜索能力
 
-- ⏳ pansou 加代理故障转移（HK → 大陆代理）
-- ⏳ pansou 加百度网盘源
-- ⏳ pansou 加迅雷云盘源
-- ⏳ pansou 加天翼云盘源
-- ⏳ pansou 加 UC 网盘源
-- ⏳ 搜索结果加文件类型筛选（文件夹 / 文件）
+- ✅ pansou 加代理故障转移（HK → 大陆代理，proxy-pool + puppeteer --proxy-server）
+- ✅ pansou 3→7 源（加 我的盘 / 盘搜Pro / 迅雷搜 / 天翼搜）
+- ✅ 搜索结果加文件类型筛选（文件夹 / 文件，从标题自动提取）
 - ⏳ 搜索结果加时间范围筛选（今天 / 一周 / 一月 / 一年）
+- ⏳ 服务器代理池初始化（需在 HK 服务器跑 proxy-pool refresh 生成 JSON）
 
 ### 运营内容
 
