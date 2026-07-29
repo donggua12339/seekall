@@ -208,58 +208,52 @@ const PAN_SOURCES: PanSource[] = [
 
 // ─── 规则主体 ─────────────────────────────────────────────
 
-const PAGE_TIMEOUT = 8_000
+const PAGE_TIMEOUT = 12_000
 
 export const pansouRule: Rule = {
   name: '@seekall/rule-pansou',
-  version: '0.2.0',
+  version: '0.2.1',
   riskLevel: 3,
-  description: '网盘资源搜索（7 源无头浏览器 + 代理故障转移）',
+  description: '网盘资源搜索（7 源无头浏览器，直连优先 + 代理 opt-in）',
 
   async run(query: string, ctx: RuleContext): Promise<Hit[]> {
-    ctx.logger.info(`pansou: 搜索 "${query}"，${PAN_SOURCES.length} 源并行渲染`)
+    const useProxy = process.env.PANSOU_PROXY === '1'
+    ctx.logger.info(`pansou: 搜索 "${query}"，${PAN_SOURCES.length} 源并行渲染 (proxy=${useProxy})`)
 
-    // 尝试获取大陆代理
+    // 代理模式：仅 PANSOU_PROXY=1 时启用（免费代理质量差，浏览器级别代理无 per-source 故障转移）
     let proxyHost: string | undefined
     let proxyPort: number | undefined
     let proxyProtocol: string | undefined
-    try {
-      const info = await getProxyInfo()
-      if (info) {
-        const m = info.url.match(/(\d+\.\d+\.\d+\.\d+):(\d+)/)
-        if (m) {
-          proxyHost = m[1]
-          proxyPort = parseInt(m[2], 10)
-          proxyProtocol = info.protocol
-          ctx.logger.info(`pansou: 使用代理 ${proxyHost}:${proxyPort} (${proxyProtocol})`)
+    if (useProxy) {
+      try {
+        const info = await getProxyInfo()
+        if (info) {
+          const m = info.url.match(/(\d+\.\d+\.\d+\.\d+):(\d+)/)
+          if (m) {
+            proxyHost = m[1]
+            proxyPort = parseInt(m[2], 10)
+            proxyProtocol = info.protocol
+            ctx.logger.info(`pansou: 使用代理 ${proxyHost}:${proxyPort} (${proxyProtocol})`)
+          }
         }
+      } catch {
+        ctx.logger.warn(`pansou: 代理获取失败，走直连`)
       }
-    } catch {
-      // 代理获取失败，走直连
     }
 
-    // 尝试用代理启动浏览器，失败回退直连
     let browser: Browser
-    let usedProxy = false
     try {
       browser = await launchBrowser(proxyHost, proxyPort, proxyProtocol)
-      usedProxy = !!proxyHost
     } catch (launchErr) {
       if (proxyHost) {
         ctx.logger.warn(`pansou: 代理启动浏览器失败，回退直连`)
-        if (cachedPool) {
-          cachedPool.reportFailure(`http://${proxyHost}:${proxyPort}`)
-        }
-        try {
-          browser = await launchBrowser()
-        } catch (err2) {
-          const msg = err2 instanceof Error ? err2.message : String(err2)
-          ctx.logger.error(`pansou: 直连启动浏览器也失败: ${msg}`)
+        if (cachedPool) cachedPool.reportFailure(`http://${proxyHost}:${proxyPort}`)
+        try { browser = await launchBrowser() } catch (err2) {
+          ctx.logger.error(`pansou: 直连也失败: ${err2 instanceof Error ? err2.message : String(err2)}`)
           return []
         }
       } else {
-        const msg = launchErr instanceof Error ? launchErr.message : String(launchErr)
-        ctx.logger.error(`pansou: 启动浏览器失败: ${msg}`)
+        ctx.logger.error(`pansou: 启动浏览器失败: ${launchErr instanceof Error ? launchErr.message : String(launchErr)}`)
         return []
       }
     }
@@ -336,7 +330,7 @@ export const pansouRule: Rule = {
         if (s.status === 'fulfilled') allHits.push(...s.value)
       }
 
-      if (usedProxy && proxyHost && allHits.length > 0 && cachedPool) {
+      if (proxyHost && allHits.length > 0 && cachedPool) {
         cachedPool.reportSuccess(`http://${proxyHost}:${proxyPort}`)
       }
 
@@ -348,7 +342,7 @@ export const pansouRule: Rule = {
         return true
       })
 
-      ctx.logger.info(`pansou: 共 ${deduped.length} 条去重结果 (proxy=${usedProxy})`)
+      ctx.logger.info(`pansou: 共 ${deduped.length} 条去重结果 (proxy=${!!proxyHost})`)
       return deduped
     } finally {
       try { await browser.close() } catch { /* ignore */ }
