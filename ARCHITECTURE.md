@@ -1,242 +1,305 @@
-# 觅源 SeekAll - 架构设计
+# 觅源 SeekAll 架构设计
+
+> 版本：v0.6 | 最后更新：2026-07-28
+
+---
 
 ## 整体架构
 
 ```
-┌─────────────────────────────────────────────────┐
-│                   用户浏览器                      │
-└────────────────┬────────────────────────────────┘
-                 │ HTTPS
-                 ▼
-┌─────────────────────────────────────────────────┐
-│              Cloudflare (仅 DNS)                 │
-└────────────────┬────────────────────────────────┘
-                 │
-                 ▼
-┌─────────────────────────────────────────────────┐
-│              Caddy (反向代理 + HTTPS)            │
-│   seekall.winmelon.cn / admin.seekall.winmelon.cn │
-└──────┬──────────────────────────────┬───────────┘
-       │ /api/*                        │ /*
-       ▼                                ▼
-┌──────────────┐               ┌──────────────┐
-│  seekall-api │               │  seekall-web │
-│  (NestJS)    │◄──────────────│  (Nuxt 3 SSR)│
-└──────┬───────┘   HTTP        └──────────────┘
-       │
-       ├──► MySQL 8 (主数据)
-       ├──► Redis 7 (缓存 + 限流 + 队列)
-       ├──► Meilisearch (全文检索)
-       ├──► Resend / QQ SMTP (邮件)
-       └──► 外部 Provider (PanSou / 磁力站 / 夸克)
+                        用户浏览器
+                            │
+                       HTTPS (443)
+                            │
+                            ▼
+               ┌─────────────────────────┐
+               │   Cloudflare (仅 DNS)    │
+               └────────────┬────────────┘
+                            │
+                            ▼
+               ┌─────────────────────────┐
+               │  主机 nginx (雨云 apt)   │
+               │  Let's Encrypt 通配符    │
+               │  *.winmelon.cn          │
+               └──┬──────┬──────┬───────┘
+                  │      │      │
+     seekall.    │      │      │   user.
+     winmelon.cn │      │      │   seekall.
+                  │      │      │   winmelon.cn
+                  │      │      │
+                  ▼      ▼      ▼
+            ┌────────┐ ────────┐ ┌──────────┐
+            │docs-site│ │ admin  │ │ user-spa │
+            │.6 :80  │ │.7 :80  │ │.9 :80    │
+            │VitePress│ │Vue 3   │ │Vue 3     │
+            └────────┘ └────────┘ └──────────┘
+                  │      │      │
+                  │  /api/* 反代  │
+                  ▼      ▼      ▼
+               ┌─────────────────┐
+               │  seekall-api    │
+               │  .5 :7301      │
+               │  NestJS+Fastify │
+               └──┬────┬────┬───┘
+                  │    │    │
+                  ▼    ▼    ▼
+            ┌──────┐ ┌─────┐ ┌───────────┐
+            │MySQL 8│ │Redis│ │Meilisearch│
+            │  :3306│ │:6379│ │   :7700   │
+            └──────┘ └───── └───────────┘
 ```
 
-## 模块划分
+### 网络拓扑
 
-### 后端 (apps/api)
+| 域名                      | 容器                | IP         | 端口 | 说明                          |
+| ------------------------- | ------------------- | ---------- | ---- | ----------------------------- |
+| seekall.winmelon.cn       | seekall-docs-site   | 172.18.0.6 | 80   | VitePress 静态站 + /api/ 反代 |
+| admin.seekall.winmelon.cn | seekall-admin       | 172.18.0.7 | 80   | Admin SPA + /api/ 反代        |
+| user.seekall.winmelon.cn  | seekall-user-spa    | 172.18.0.9 | 80   | User SPA + /api/ 反代         |
+| _(内部)_                  | seekall-api         | 172.18.0.5 | 7301 | NestJS API                    |
+| _(内部)_                  | seekall-mysql       | 动态       | 3306 | MySQL 8                       |
+| _(内部)_                  | seekall-redis       | 动态       | 6379 | Redis 7                       |
+| _(内部)_                  | seekall-meilisearch | 动态       | 7700 | Meilisearch（预留）           |
+
+每个前端容器的 nginx 都配了 `location /api/ { proxy_pass http://172.18.0.5:7301; }` 反代到 API。
+
+---
+
+## 后端模块（apps/api）
 
 ```
 src/
-├── common/                # 公共层
-│   ├── constants/         # 错误码、枚举
-│   ├── decorators/        # @Public @Roles @CurrentUser
-│   ├── filters/           # 全局异常过滤器
-│   ├── guards/            # JWT 守卫
-│   ├── interceptors/      # 响应拦截器
-│   └── utils/             # 工具函数
-├── config/                # 环境变量校验
-├── database/              # Prisma + Redis
+├── common/
+│   ├── constants/
+│   │   └── error-codes.ts        # 5 位错误码体系
+│   ├── decorators/
+│   │   ├── public.decorator.ts    # @Public() 豁免 JWT
+│   │   ├── roles.decorator.ts     # @Roles('super_admin')
+│   │   └── current-user.decorator.ts  # @CurrentUser('sub')
+│   ├── filters/
+│   │   └── http-exception.filter.ts   # 全局异常 → {code, data, message}
+│   ├── guards/
+│   │   └── jwt-auth.guard.ts     # JWT 校验 + 软认证（public 路由也解析 token）
+│   ├── interceptors/
+│   │   └── response.interceptor.ts    # 统一响应包装
+│   └── utils/
+│       ├── hash.util.ts           # argon2 哈希
+│       └── invite-code.util.ts    # 邀请码生成
+├── config/
+│   └── env.validation.ts          # 环境变量校验
+├── database/
+│   ├── prisma.service.ts          # Prisma 连接
+│   └── redis.module.ts            # Redis 连接
 ├── modules/
-│   ├── auth/              # 认证（注册/登录/邮箱验证/密码重置）
-│   ├── user/              # 用户（个人主页/偏好/会员激活/注销）
-│   ├── invite-code/       # 邀请码（注册用）
-│   ├── membership-code/   # 会员激活码（付费用）
-│   ├── search/            # 搜索聚合（缓存/去重/过滤）
-│   ├── provider/          # Provider 框架
-│   │   ├── interfaces/    # IProvider 接口
-│   │   └── providers/     # 具体实现（pansou/magnet/quark）
-│   ├── search-history/    # 搜索历史
-│   ├── favorite/          # 收藏夹
-│   ├── takedown/          # 侵权举报、下架
-│   ├── blocked-keyword/   # 关键词黑名单
-│   ├── link-checker/      # 失效链接检测（BullMQ）
-│   ├── admin/             # 后台管理
-│   ├── agreement/         # 用户协议
-│   ├── mail/              # 邮件服务（Resend/QQ）
-│   ├── meilisearch/       # Meilisearch 客户端
-│   └── health/            # 健康检查
-└── workers/               # 定时任务（清理日志/链接检测）
+│   ├── auth/                      # 注册/登录/邮箱验证/密码重置/refresh
+│   ├── user/                      # 个人资料/交易/收据/退款/云同步
+│   ├── admin/                     # dashboard/users/audit/analytics/badge/设置
+│   ├── rule/                      # 列表/提交/评审/终审/takedown/subscribe/contributors
+│   ├── license/                   # generate/redeem/disable/invite-trial/wm-webhook
+│   ├── search/                    # greenhub + pansou 并行搜索
+│   ├── dmca/                      # 公众提交 + admin 处理 + 透明度报告
+│   ├── mail/                      # Resend + QQ SMTP
+│   └── health/                    # 健康检查
+└── main.ts                        # 启动 + 全局管道/守卫/拦截器/限流
 ```
 
-### 前端 (apps/web)
+### 模块依赖关系
 
 ```
-├── pages/
-│   ├── index.vue          # 首页（搜索框）
-│   ├── search.vue         # 搜索结果
-│   ├── auth/
-│   │   ├── login.vue
-│   │   ├── register.vue
-│   │   ├── verify-email.vue
-│   │   └── reset-password.vue
-│   ├── profile.vue        # 个人主页
-│   ├── favorites.vue      # 收藏夹
-│   ├── takedown.vue       # 侵权举报
-│   ├── agreement.vue      # 用户协议
-│   └── admin/             # 后台
-├── components/
-│   ├── AppHeader.vue
-│   ├── AppFooter.vue
-│   └── admin/             # 后台管理组件
-├── layouts/
-│   ├── default.vue        # 默认布局
-│   └── admin.vue          # 后台布局
-├── stores/
-│   └── auth.ts            # 认证状态
-├── composables/
-│   └── useApi.ts          # API 调用封装
-└── uno.config.ts          # UnoCSS 配置
+auth ──► prisma, redis, jwt, mail
+user ──► prisma
+admin ──► prisma
+rule ──► prisma
+license ──► prisma, config
+search ──► prisma, @seekall/rule-greenhub, @seekall/rule-pansou
+dmca ──► prisma, mail, redis
+mail ──► config
+health ──► prisma, redis
 ```
 
-## 数据流
+---
 
-### 搜索流程
-
-```
-用户输入关键词
-    ↓
-前端 GET /api/v1/search?keyword=xxx
-    ↓
-SearchController → SearchService
-    ↓
-┌─ 关键词黑名单校验
-├─ Redis 缓存查询
-│   ├─ 命中 → 直接返回
-│   └─ 未命中 → 继续
-├─ ProviderService.searchAll()
-│   ├─ Promise.allSettled 并发调用所有 Provider
-│   ├─ 单源 5s 超时，失败降级
-│   └─ 结果合并
-├─ URL 去重（MD5 hash）
-├─ 过滤失效链接（link_status 表）
-├─ 过滤 takedown 资源
-├─ 分页
-├─ 写 Redis 缓存（1 小时 TTL）
-├─ 写搜索日志
-└─ 返回结果
-```
-
-### 注册流程
+## 搜索架构
 
 ```
-用户填写邀请码 + 用户名 + 邮箱 + 密码 + 协议
-    ↓
-POST /api/v1/auth/register
-    ↓
-AuthService.register()
-    ├─ 校验邀请码（格式 + 状态 + 过期）
-    ├─ 校验用户名/邮箱唯一性
-    ├─ 密码强度校验
-    ├─ argon2 哈希密码
-    ├─ 创建用户（status: pending_verification）
-    ├─ 标记邀请码已使用
-    ├─ 创建用户偏好
-    ├─ 发送验证邮件（Resend/QQ SMTP）
-    └─ 返回"请查收邮件"
+                    SearchController
+                         │
+                    SearchService.search()
+                         │
+              ┌──────────┼──────────┐
+              │          │          │
+              ▼          ▼          ▼
+         greenhub    pansou    (订阅规则)
+         (底座)      (底座)     (用户触发)
+              │          │
+     ┌────────┤     ┌────┤
+     │11 源并行│     │3 源并行│
+     │HTTP+cheerio│  │puppeteer│
+     │+代理转移│     │无头浏览器│
+     └────────┘     └────┘
+              │          │
+              ▼          ▼
+         Promise.allSettled → 去重 → 域名聚合 → 返回
 ```
 
-### Provider 调用
+### greenhub（11 源 HTTP 并行）
+
+| 源         | 分类 | 技术              |
+| ---------- | ---- | ----------------- |
+| 果核剥壳   | 软件 | WordPress cheerio |
+| 423down    | 软件 | WordPress cheerio |
+| 殁漂遥     | 软件 | WordPress cheerio |
+| 乐软       | 软件 | WordPress cheerio |
+| 小众软件   | 软件 | WordPress cheerio |
+| 异次元软件 | 软件 | WordPress cheerio |
+| ACGBNS     | 游戏 | WordPress cheerio |
+| 游戏SSP    | 游戏 | WordPress cheerio |
+| 脑洞       | 综合 | WordPress cheerio |
+| 动漫花园   | 动漫 | 专用 table 解析   |
+| 蜜柑计划   | 动漫 | 专用列表解析      |
+
+**代理故障转移**：直连 4s 超时 → 大陆代理（socks4/5/http）最多 2 次 → 硬超时 12s 兜底。
+
+### pansou（3 源无头浏览器并行）
+
+| 源         | 技术                    |
+| ---------- | ----------------------- |
+| 夸克搜索   | puppeteer-core CSR 渲染 |
+| UP云搜     | puppeteer-core CSR 渲染 |
+| 阿里云盘搜 | puppeteer-core CSR 渲染 |
+
+每次搜索临时 launch 浏览器，3 源 Promise.allSettled 并行，结束即 close。
+
+---
+
+## 前端架构
+
+### Admin SPA（apps/admin）
+
+- Vue 3 + Naive UI + Pinia + Vue Router
+- 8 页面：Dashboard / DMCA / 规则评审 / License / 用户管理 / 退款审核 / 审计日志 / 系统设置
+- JWT 认证 + 401 自动刷新
+- 后端 @Roles('super_admin') 保护，前端不做角色拦截
+
+### User SPA（apps/user-spa）
+
+- Vue 3 + Naive UI + Pinia + Vue Router
+- 搜索页独立路由（public，全屏沉浸式）
+- MainLayout 内 14 页面（Dashboard / 市场 / 规则 / License / 订阅 / 交易 / 退款 / DMCA / 设置等）
+- JWT 认证 + 401 自动刷新
+- 搜索免登录（public 路由 + 软认证）
+
+### Docs Site（apps/docs-site）
+
+- VitePress 1.6 静态生成
+- 指南 / SDK / 规则市场 / 合规 / API / Blog / 贡献者
+- 内置 sitemap + robots.txt + OG meta
+- 组件：RuleMarket.vue / ContributorsLeaderboard.vue
+
+---
+
+## 数据库架构
+
+### 9 张表
 
 ```
-SearchService
-    ↓
-ProviderService.searchAll()
-    ↓
-活跃 Provider 列表（按 enabled 过滤）
-    ↓
-Promise.allSettled([
-  PansouProvider.search()   // 5s 超时
-  MagnetProvider.search()   // 5s 超时
-  QuarkProvider.search()    // 5s 超时
-])
-    ↓
-失败 Provider 返回空数组 + 日志告警
-    ↓
-结果合并 + URL 去重
-    ↓
-返回给 SearchService
+users ──────┬──► licenses ──────► license_claims
+            │
+            ├──► rules ─────┬──► rule_subscriptions
+            │               ├──► rule_reviews
+            │               └──► dmca_notices
+            │
+            ├──► admin_audit_logs
+            │
+            └──► dmca_notices (handler)
+
+configs (独立 key-value)
 ```
 
-## 数据库设计
+### 核心表字段
 
-详见 [prisma/schema.prisma](./apps/api/prisma/schema.prisma)。
+| 表                 | 关键字段                                               | 索引                                   |
+| ------------------ | ------------------------------------------------------ | -------------------------------------- |
+| users              | id, username, email, role, isPaid, tier, status, badge | status, isPaid                         |
+| licenses           | id, code(unique), tier, status, usedBy                 | tier, status, generatedBy              |
+| rules              | id, npmPackage(unique), riskLevel, status, authorId    | riskLevel, status, authorId            |
+| admin_audit_logs   | id, adminId, action, targetType, targetId              | adminId, action, (targetType,targetId) |
+| configs            | key(PK), value                                         | -                                      |
+| license_claims     | id, userId, licenseId                                  | (userId,licenseId) unique              |
+| rule_subscriptions | id, userId, ruleId                                     | (userId,ruleId) unique                 |
+| rule_reviews       | id, ruleId, reviewerId, approve                        | (ruleId,reviewerId) unique             |
+| dmca_notices       | id, status, ruleId, handlerAdminId                     | status, ruleId, createdAt              |
 
-核心表：
+---
 
-- `users` - 用户
-- `user_preferences` - 用户偏好
-- `invite_codes` - 邀请码（注册用）
-- `membership_codes` - 会员激活码
-- `search_history` - 搜索历史
-- `search_logs` - 搜索日志（90 天保留）
-- `favorites` - 收藏夹
-- `link_status` - 失效链接状态
-- `takedown_records` - 侵权举报
-- `blocked_keywords` - 关键词黑名单
-- `agreements` - 用户协议
-- `user_agreements` - 协议同意记录
-- `admin_audit_logs` - 管理员审计日志（1 年保留）
+## 认证流程
 
-## 安全设计
+```
+注册 → status=active（直接可用）
+     → 发送验证邮件（code 或 link，不阻断注册）
+     → 用户可选验证邮箱
 
-- **认证**：JWT Access (15m) + Refresh (7d) + argon2 哈希
-- **授权**：基于角色的访问控制（super_admin / user）
-- **限流**：全局 + 搜索 + 登录 + 注册 + 密码重置
-- **输入校验**：class-validator DTO
-- **SQL 注入防护**：Prisma 参数化查询
-- **XSS 防护**：Vue 模板转义 + sanitize-html
-- **CSRF 防护**：JWT Bearer Token
-- **HTTPS**：Caddy 自动申请 Let's Encrypt 证书
-- **安全头**：CSP、X-Frame-Options、HSTS 等
+登录 → JWT Access (15min) + Refresh (7d)
+     → Refresh Token 存 Redis Set（支持多设备）
 
-## 合规设计
+API 请求 → JwtAuthGuard
+         → @Public 路由：软认证（有 token 就解析，没有也放行）
+         → 非 @Public 路由：必须有合法 token
+         → @Roles 路由：额外检查 role
+```
 
-- **链接聚合**：只存链接 + 元数据，不存文件内容
-- **takedown 流程**：24h 响应，记录到 `takedown_records`
-- **关键词黑名单**：所有用户统一过滤
-- **免责声明**：注册强制勾选 + 页脚常驻
-- **用户协议**：版本化管理，记录同意历史
-- **审计日志**：管理员操作全程可追溯
-
-## 性能设计
-
-- **缓存**：Redis 缓存热门搜索结果（1 小时 TTL）
-- **并发**：Provider 并发搜索，单源超时不阻塞整体
-- **失效链接检测**：BullMQ 异步任务，HEAD 请求 5s 超时
-- **数据库索引**：高频查询字段建立索引
-- **SSR**：Nuxt 3 服务端渲染，首屏快
-- **静态资源**：Caddy gzip + zstd 压缩
-
-## 可扩展性
-
-- **Provider 插件化**：新增数据源只需实现 IProvider 接口
-- **模块化**：NestJS 模块独立，便于维护
-- **monorepo**：pnpm workspace，前后端共享类型
-- **水平扩展**：v0.2+ 可拆分 worker 独立部署
+---
 
 ## 部署架构
 
-单机 Docker Compose 部署：
+### Docker Compose（7 服务）
 
 ```yaml
 services:
-  caddy: # 反代 + HTTPS
-  seekall-api: # NestJS
-  seekall-web: # Nuxt 3 SSR
-  mysql: # 数据库
-  redis: # 缓存 + 队列
-  meilisearch: # 全文检索
+  seekall-api: # NestJS, 172.18.0.5:7301
+  seekall-docs-site: # VitePress+nginx, 172.18.0.6:80
+  seekall-admin: # Vue3+nginx, 172.18.0.7:80
+  seekall-user-spa: # Vue3+nginx, 172.18.0.9:80
+  seekall-mysql: # MySQL 8, 3306
+  seekall-redis: # Redis 7, 6379
+  seekall-meilisearch: # Meilisearch, 7700 (预留)
 ```
 
-资源占用：~2GB 内存、~6GB 磁盘。
-推荐配置：2C4G + 40GB SSD（最低），4C8G + 80GB SSD（舒适）。
+### 构建注意
+
+- **必须串行构建**：4GB 服务器并行 build 4 镜像会 OOM
+- Alpine 镜像需 `apk add --no-cache openssl`（Prisma engine 依赖）
+- pnpm 9 + hoisted 模式下 prisma generate 需用 `node node_modules/prisma/build/index.js generate`
+
+### 主机 nginx
+
+- 每个子域名一个 vhost 文件
+- 通配符证书 `*.winmelon.cn`（Let's Encrypt）
+- 每个前端 vhost 必须有 `/api/` 反代到 API 容器
+- robots.txt 由主机 nginx 直接 serve（不走容器）
+
+---
+
+## 安全架构
+
+### 5 条红线
+
+1. SDK 默认包不塞网盘/磁力/盗版站 Rule
+2. L3/L4 规则永不公开
+3. 不做评论/评分/论坛
+4. rule 模块禁止 outbound HTTP
+5. 不集成支付 SDK
+
+### 防御层
+
+| 层   | 措施                                                           |
+| ---- | -------------------------------------------------------------- |
+| 网络 | Cloudflare DNS + HTTPS + HSTS                                  |
+| 反代 | nginx 安全头（X-Frame-Options / CSP / X-Content-Type-Options） |
+| 限流 | @nestjs/throttler 全局 + 端点级                                |
+| 认证 | JWT + argon2 + Refresh 白名单                                  |
+| 校验 | class-validator DTO + whitelist + forbidNonWhitelisted         |
+| 注入 | Prisma 参数化查询                                              |
+| XSS  | Vue 模板自动转义                                               |
+| 监控 | Sentry 5xx 上报                                                |
+| 合规 | DMCA §512(c) + 透明度报告                                      |

@@ -5,6 +5,50 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-07-28
+
+### v0.6 完整版：留存 + 生态 + 搜索 + 规约
+
+#### Added
+
+- **注册直接 active**：不再卡 pending_verification，注册完即可登录
+- **邮箱验证双模式**：验证码模式（6 位数字，Redis 10min）+ 链接模式（token，DB 30min），admin 可切换
+- **JWT guard 软认证**：public 路由带合法 token 也解析 @CurrentUser
+- **搜索免登录**：搜索页 @Public + 独立路由 + 顶部导航栏
+- **pansou 默认开启**：加入 BASE_RULES，不需要手动勾选
+- **pansou 并行化**：3 源 Promise.allSettled 并行渲染，超时 30s → 15s
+- **搜索页导航栏**：登录/注册/用户中心/暗色切换，毛玻璃背景
+- **热搜词优化**：6 → 12 个（考研/四级/我的世界/小说/电子书等）
+- **Admin 系统设置页**：邮箱验证模式切换（code/link 单选）
+- **项目规约文件**：spec.md / plan.md / tasks.md 补齐
+- **ARCHITECTURE.md 重写**：从 v0.4 过时架构更新到 v0.6 实际架构
+- **CONTRIBUTING.md 重写**：修正 Nuxt/Caddy/PanSou 等过时引用
+- **SEO 文章 6 篇**：知乎 2 + CSDN 2 + dev.to 1 + Medium 1
+- **小红书图文 3 条**：SDK 介绍 + 风险评级 + ¥1 试用
+- **内容分发交接 prompt**：docs/content-publish-handoff.md
+
+#### Fixed
+
+- **注册后无法登录**：pending_verification 状态被登录拒绝，改为自动转 active
+- **redeem 返回格式**：$transaction 返回裸 User → 改为 {license, user} + BigInt 安全序列化
+- **邮件发送失败阻断注册**：try/catch 包裹，失败只记日志
+- **僵尸 pending 用户**：重新注册时自动清理同 username/email 的 pending 记录
+- **Dashboard 数据全 0**：deletedAt:null 查询在 v0.5 schema 不存在，改为 status:{not:'deleted'}
+- **Dashboard 字段不匹配**：后端返回嵌套对象 vs 前端期望扁平字段，统一为扁平
+- **Analytics 与 Dashboard 重叠**：合并到 Dashboard，删除独立路由和菜单
+- **Admin 路由守卫**：去掉前端 isSuperAdmin 拦截（后端 @Roles 已保护）
+- **Admin nginx 502**：proxy_pass 指向 172.18.0.8（meilisearch）改为 0.7（admin）
+- **Admin nginx 405**：缺 /api/ location 反代，补上 proxy_pass 到 API 容器
+- **meilisearch IP 冲突**：dht-meilisearch 遗留容器占 0.7，断开网络
+
+#### Changed
+
+- 搜索页从 MainLayout children 移出为独立 public 路由
+- 去掉 pansou 勾选框（已默认跑）
+- 加载提示从"11 个资源站"改为"14+ 个资源站"
+
+---
+
 ## [0.5.4] - 2026-07-23
 
 ### v0.6 第二波：留存体验 + 生态建设
@@ -42,6 +86,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 - certbot certonly 不带 `--expand` 重签会丢原有 SAN 域名
 - 百度 sitemap 配额 0 条（无 ICP 备案），只能用手动提交
 - 主机 nginx `location = /robots.txt` 会覆盖 docs-site 容器里的 robots.txt
+
+---
+
+## [0.5.3] - 2026-07-22
+
+### v0.6 第一波 + 运维修复
+
+#### Added
+
+- **邀请码裂变**：月度/终身会员每月 3 个 ¥1 试用邀请码
+- **README 优化**：重写为规则引擎定位
+- **npm 下载量统计**：规则市场 + admin Dashboard 展示上周下载量
+- **User SPA 部署**：user.seekall.winmelon.cn 上线（172.18.0.9）
+
+#### Fixed
+
+- **L2 tier 校验白嫖漏洞**：trial 用户（isPaid=true）可订阅 L2，加 validateUserTier()
+- **wm-webhook 3 bug**：@Public 缺失 / DTO amount 缺 @IsNumber / Secret 未配置
+
+---
+
+## [0.5.2] - 2026-07-21
+
+### Quick Win + User SPA + SDK CLI
+
+#### Added
+
+- **User SPA**：14 页面 SaaS 级用户中心（Dashboard / 搜索 / 规则 / License / 订阅 / 交易 / 退款 / DMCA / 设置）
+- **SDK CLI 完整命令集**：search / license redeem / sync / rules list|install|uninstall / config / whoami / init
+- **性能差异化**：tier-based concurrency + timeout + in-memory cache
+- **云同步**：configs 表 + CLI sync 命令
+- **退款审核**：user 申请 + admin 审批 + License 自动禁用
+- **OpenAPI 在线文档**：Redoc iframe + /api/v1/docs-json
+- **17 个规则包发布**：6 L0 + 4 L1 + 7 L2
+
+#### Fixed
+
+- **限流**：@nestjs/throttler 全局 100/min + 认证端点 3-5/min
+- **Swagger 生产收敛**：NODE_ENV !== production 守卫
+- **robots.txt**：/var/www/seekall/robots.txt + nginx location
+- **备份演练**：MySQL 9 表 + Redis RDB 验证
+
+---
+
+## [0.5.1] - 2026-07-19
+
+### 上线后修复
+
+#### Fixed
+
+- **WM webhook 实测**：3 bug 修复后生产闭环（订单 337300568525508608）
+- **npm publish**：@seekall/sdk + 5 规则包首发
+- **docs-site /health**：vitepress nginx 加健康检查路由
+- **GET /rules 校验**：riskLevel 枚举序列化修复
 
 ---
 
