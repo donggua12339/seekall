@@ -19,6 +19,7 @@ const result = ref<SearchResult | null>(null)
 const errorMsg = ref('')
 const activeSource = ref<string>('') // 域名过滤
 const activeCategory = ref<string>('all')
+const activeFileType = ref<string>('all') // 文件类型过滤（仅网盘结果有效）
 
 const HOT_SEARCHES = [
   'Photoshop', 'WPS', 'Office 2024', '剪映',
@@ -45,6 +46,7 @@ async function doSearch(raw?: string, presetCategory?: string) {
   state.value = 'loading'
   activeSource.value = ''
   activeCategory.value = presetCategory ?? 'all'
+  activeFileType.value = 'all'
   errorMsg.value = ''
   try {
     result.value = await searchApi.search(q)
@@ -115,6 +117,26 @@ const categories = computed(() => {
     .sort((a, b) => b.count - a.count)
 })
 
+// ── 文件类型聚合（仅网盘结果有 fileType 标记）──
+const FILE_TYPE_META: Record<string, { label: string; icon: string }> = {
+  file: { label: '文件', icon: '📄' },
+  folder: { label: '文件夹', icon: '📁' },
+}
+
+const fileTypeStats = computed(() => {
+  if (!result.value) return []
+  const map = new Map<string, number>()
+  for (const h of result.value.results) {
+    const ft = (h.meta?.fileType as string) || 'unknown'
+    if (ft === 'unknown') continue
+    map.set(ft, (map.get(ft) || 0) + 1)
+  }
+  if (map.size === 0) return [] // 无网盘结果时不显示
+  return [...map.entries()]
+    .map(([key, count]) => ({ key, count, ...(FILE_TYPE_META[key] || { label: key, icon: '❓' }) }))
+    .sort((a, b) => b.count - a.count)
+})
+
 // ── 结果过滤 ──
 const filteredResults = computed<SearchHit[]>(() => {
   if (!result.value) return []
@@ -122,6 +144,10 @@ const filteredResults = computed<SearchHit[]>(() => {
     const cat = (h.meta?.category as string) || 'general'
     if (activeCategory.value !== 'all' && cat !== activeCategory.value) return false
     if (activeSource.value && h.source !== activeSource.value) return false
+    if (activeFileType.value !== 'all') {
+      const ft = (h.meta?.fileType as string) || 'unknown'
+      if (ft !== activeFileType.value) return false
+    }
     return true
   })
 })
@@ -207,7 +233,7 @@ function openUrl(url: string) {
       <div v-if="state === 'loading'" class="loading">
         <div class="loading-status">
           <span class="dot-pulse"><i /><i /><i /></span>
-          正在并行检索 14+ 个资源站…
+          正在并行检索 18+ 个资源站…
         </div>
         <div v-for="n in 6" :key="n" class="skeleton-card">
           <NSkeleton height="20px" width="60%" />
@@ -276,6 +302,27 @@ function openUrl(url: string) {
             @click="activeSource = activeSource === s.domain ? '' : s.domain"
           >
             {{ s.label }}<span class="chip-count">{{ s.count }}</span>
+          </button>
+        </div>
+
+        <!-- 文件类型筛选（仅网盘结果存在时显示） -->
+        <div v-if="fileTypeStats.length" class="sources">
+          <span class="filter-label">文件类型</span>
+          <button
+            class="src-chip"
+            :class="{ active: activeFileType === 'all' }"
+            @click="activeFileType = 'all'"
+          >
+            全部
+          </button>
+          <button
+            v-for="ft in fileTypeStats"
+            :key="ft.key"
+            class="src-chip"
+            :class="{ active: activeFileType === ft.key }"
+            @click="activeFileType = activeFileType === ft.key ? 'all' : ft.key"
+          >
+            {{ ft.icon }} {{ ft.label }}<span class="chip-count">{{ ft.count }}</span>
           </button>
         </div>
 
@@ -690,6 +737,11 @@ function openUrl(url: string) {
 .sources {
   margin-bottom: 24px;
   padding-top: 4px;
+}
+.filter-label {
+  font-size: 12px;
+  color: var(--text-faint);
+  margin-right: 4px;
 }
 .cat-chip, .src-chip {
   display: inline-flex;

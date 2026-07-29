@@ -576,6 +576,9 @@ importers:
 
   packages/rule-pansou:
     dependencies:
+      '@seekall/proxy-pool':
+        specifier: workspace:*
+        version: link:../proxy-pool
       '@seekall/sdk':
         specifier: workspace:*
         version: link:../sdk
