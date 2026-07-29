@@ -233,7 +233,7 @@ function openUrl(url: string) {
       <div v-if="state === 'loading'" class="loading">
         <div class="loading-status">
           <span class="dot-pulse"><i /><i /><i /></span>
-          正在并行检索 18+ 个资源站…
+          正在并行检索 13 个资源站…
         </div>
         <div v-for="n in 6" :key="n" class="skeleton-card">
           <NSkeleton height="20px" width="60%" />

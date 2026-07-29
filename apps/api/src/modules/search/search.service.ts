@@ -64,10 +64,10 @@ const CATEGORY_LABELS: Record<string, string> = {
   general: '综合',
 }
 
-/** 各规则超时（ms）：greenhub 快，pansou 并行后降到 15s */
+/** 各规则超时（ms）：greenhub 快，pansou 需等 puppeteer 启动+渲染+提取 */
 const RULE_TIMEOUT: Record<string, number> = {
   greenhub: 20_000,
-  pansou: 15_000,
+  pansou: 25_000,
 }
 
 /** 规则包定义 */

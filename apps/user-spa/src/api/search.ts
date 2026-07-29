@@ -27,7 +27,7 @@ export const searchApi = {
   search: (q: string) =>
     http.get<unknown, SearchResult>('/search', {
       params: { q },
-      // greenhub(20s) + pansou(15s) 并行，取较大值 + 余量
-      timeout: 25_000,
+      // greenhub(20s) + pansou(25s) 并行，取较大值 + 余量
+      timeout: 30_000,
     }),
 }

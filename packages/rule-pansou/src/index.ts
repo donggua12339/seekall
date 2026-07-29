@@ -160,61 +160,26 @@ const PAN_SOURCES: PanSource[] = [
     label: '夸克搜索',
     buildUrl: (q) => `https://search.quark.cn/s?q=${encodeURIComponent(q)}`,
     waitSelector: '[class*="result"], [class*="card"], [class*="item"]',
-    extraWait: 1500,
+    extraWait: 3000,
   },
   {
     id: 'upyunso',
     label: 'UP云搜',
     buildUrl: (q) => `https://www.upyunso.com/search?q=${encodeURIComponent(q)}`,
     waitSelector: '[class*="result"], [class*="item"], [class*="card"]',
-    extraWait: 1500,
-  },
-  {
-    id: 'alipansou',
-    label: '阿里云盘搜',
-    buildUrl: (q) => `https://www.alipansou.com/search?k=${encodeURIComponent(q)}`,
-    waitSelector: '[class*="result"], [class*="item"], [class*="card"], .list',
-    extraWait: 1500,
-  },
-  {
-    id: 'wodepan',
-    label: '我的盘',
-    buildUrl: (q) => `https://www.wodepan.com/search?keyword=${encodeURIComponent(q)}`,
-    waitSelector: '[class*="result"], [class*="item"], [class*="list"], .search-list',
-    extraWait: 1500,
-  },
-  {
-    id: 'pansou',
-    label: '盘搜Pro',
-    buildUrl: (q) => `https://www.pansou.com/search?q=${encodeURIComponent(q)}`,
-    waitSelector: '[class*="result"], [class*="item"], [class*="card"], .list',
-    extraWait: 1500,
-  },
-  {
-    id: 'xunleisou',
-    label: '迅雷搜',
-    buildUrl: (q) => `https://www.xunleisou.com/search?q=${encodeURIComponent(q)}`,
-    waitSelector: '[class*="result"], [class*="item"], [class*="list"]',
-    extraWait: 1500,
-  },
-  {
-    id: 'tianyisou',
-    label: '天翼搜',
-    buildUrl: (q) => `https://www.tianyisou.com/search?q=${encodeURIComponent(q)}`,
-    waitSelector: '[class*="result"], [class*="item"], [class*="list"]',
-    extraWait: 1500,
+    extraWait: 3000,
   },
 ]
 
 // ─── 规则主体 ─────────────────────────────────────────────
 
-const PAGE_TIMEOUT = 12_000
+const PAGE_TIMEOUT = 15_000
 
 export const pansouRule: Rule = {
   name: '@seekall/rule-pansou',
-  version: '0.2.1',
+  version: '0.2.2',
   riskLevel: 3,
-  description: '网盘资源搜索（7 源无头浏览器，直连优先 + 代理 opt-in）',
+  description: '网盘资源搜索（quark + upyunso 无头浏览器，HK 直连可达）',
 
   async run(query: string, ctx: RuleContext): Promise<Hit[]> {
     const useProxy = process.env.PANSOU_PROXY === '1'
