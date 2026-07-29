@@ -24,10 +24,10 @@ export interface SearchResult {
 }
 
 export const searchApi = {
-  search: (q: string) =>
+  search: (q: string, opts?: { pansou?: boolean }) =>
     http.get<unknown, SearchResult>('/search', {
-      params: { q },
-      // greenhub(20s) + pansou(25s) 并行，取较大值 + 余量
-      timeout: 30_000,
+      params: { q, pansou: opts?.pansou ? '1' : '0' },
+      // pansou 开启时放宽超时（puppeteer 慢）
+      timeout: opts?.pansou ? 35_000 : 25_000,
     }),
 }

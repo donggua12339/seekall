@@ -1,7 +1,7 @@
 import { Controller, Get, Query } from '@nestjs/common'
 import { ApiTags, ApiOperation } from '@nestjs/swagger'
 import { Throttle } from '@nestjs/throttler'
-import { IsString, MinLength, MaxLength } from 'class-validator'
+import { IsString, MinLength, MaxLength, IsOptional, IsIn } from 'class-validator'
 import { SearchService } from './search.service'
 import { Public } from '../../common/decorators/public.decorator'
 import { CurrentUser } from '../../common/decorators/current-user.decorator'
@@ -11,6 +11,10 @@ class SearchQueryDto {
   @MinLength(1, { message: '搜索关键词不能为空' })
   @MaxLength(100, { message: '搜索关键词过长' })
   q!: string
+
+  @IsOptional()
+  @IsIn(['0', '1'], { message: 'pansou 只能是 0 或 1' })
+  pansou?: string
 }
 
 @ApiTags('资源搜索')
@@ -21,8 +25,12 @@ export class SearchController {
   @Public()
   @Get()
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
-  @ApiOperation({ summary: '全网资源聚合搜索（免登录，登录后自动加载订阅规则）' })
+  @ApiOperation({ summary: '全网资源聚合搜索（免登录，pansou 可选）' })
   search(@Query() dto: SearchQueryDto, @CurrentUser('sub') userId?: string) {
-    return this.searchService.search(dto.q, {}, userId ? BigInt(userId) : undefined)
+    return this.searchService.search(
+      dto.q,
+      { pansou: dto.pansou === '1' },
+      userId ? BigInt(userId) : undefined,
+    )
   }
 }

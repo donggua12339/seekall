@@ -86,8 +86,8 @@ const PACKAGE_TO_RULE: Record<string, keyof typeof RULE_DEFS> = {
   '@seekall/rule-pansou': 'pansou',
 }
 
-/** 底座规则：无论是否订阅都会执行（greenhub + pansou 默认都跑） */
-const BASE_RULES: Array<keyof typeof RULE_DEFS> = ['greenhub', 'pansou']
+/** 底座规则：无论是否订阅都会执行 */
+const BASE_RULES: Array<keyof typeof RULE_DEFS> = ['greenhub']
 
 /**
  * 在 CJS 运行时加载 ESM 规则包。

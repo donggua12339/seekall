@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { NButton, NHighlight, NSkeleton, NEmpty } from 'naive-ui'
+import { NButton, NHighlight, NSkeleton, NEmpty, NCheckbox } from 'naive-ui'
 import { useMessage } from 'naive-ui'
 import { searchApi, type SearchResult, type SearchHit } from '@/api/search'
 import { useAppStore } from '@/stores/app'
@@ -20,6 +20,7 @@ const errorMsg = ref('')
 const activeSource = ref<string>('') // 域名过滤
 const activeCategory = ref<string>('all')
 const activeFileType = ref<string>('all') // 文件类型过滤（仅网盘结果有效）
+const includePan = ref(false) // 网盘搜索开关（puppeteer 慢，默认关）
 
 const HOT_SEARCHES = [
   'Photoshop', 'WPS', 'Office 2024', '剪映',
@@ -49,7 +50,7 @@ async function doSearch(raw?: string, presetCategory?: string) {
   activeFileType.value = 'all'
   errorMsg.value = ''
   try {
-    result.value = await searchApi.search(q)
+    result.value = await searchApi.search(q, { pansou: includePan.value })
     state.value = 'done'
   } catch (err) {
     errorMsg.value = (err as Error).message || '搜索失败'
@@ -71,6 +72,7 @@ const CATEGORY_DEFAULT_Q: Record<string, string> = {
   pan: '资源',
 }
 function pickCategory(cat: string) {
+  if (cat === 'pan') includePan.value = true
   doSearch(CATEGORY_DEFAULT_Q[cat] || cat, cat)
 }
 
@@ -218,6 +220,13 @@ function openUrl(url: string) {
         </button>
       </div>
 
+      <div class="pan-toggle">
+        <NCheckbox v-model:checked="includePan">
+          <span class="pan-toggle-label">含网盘搜索</span>
+        </NCheckbox>
+        <span class="pan-toggle-hint">无头浏览器渲染，较慢（~20s）</span>
+      </div>
+
       <!-- 初始态：热门搜索 -->
       <div v-if="state === 'idle'" class="hot">
         <span class="hot-label">试试：</span>
@@ -233,7 +242,7 @@ function openUrl(url: string) {
       <div v-if="state === 'loading'" class="loading">
         <div class="loading-status">
           <span class="dot-pulse"><i /><i /><i /></span>
-          正在并行检索 13 个资源站…
+          正在并行检索 {{ includePan ? '13' : '11' }} 个资源站…
         </div>
         <div v-for="n in 6" :key="n" class="skeleton-card">
           <NSkeleton height="20px" width="60%" />
