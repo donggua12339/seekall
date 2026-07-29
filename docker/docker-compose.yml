@@ -19,6 +19,8 @@ services:
       - MEILISEARCH_URL=http://meilisearch:7700
       # greenhub 大陆代理故障转移用的代理池文件（refresh 定期更新）
       - PROXY_POOL_FILE=/app/proxy-pool.json
+      # 大陆代理微服务地址（pansou 优先调此服务，未设置则本地 puppeteer）
+      - CN_PANSOU_URL=${CN_PANSOU_URL:-}
     volumes:
       # 代理池 JSON（只读挂载；文件必须先存在，否则 docker 会建成目录）
       - ../proxy-pool.json:/app/proxy-pool.json:ro

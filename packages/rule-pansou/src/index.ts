@@ -177,13 +177,37 @@ const PAGE_TIMEOUT = 15_000
 
 export const pansouRule: Rule = {
   name: '@seekall/rule-pansou',
-  version: '0.2.2',
+  version: '0.3.0',
   riskLevel: 3,
-  description: '网盘资源搜索（quark + upyunso 无头浏览器，HK 直连可达）',
+  description: '网盘资源搜索（大陆微服务优先 / 本地 puppeteer fallback）',
 
   async run(query: string, ctx: RuleContext): Promise<Hit[]> {
+    // ─── 大陆微服务模式：CN_PANSOU_URL 设置时，调远程服务获取结果 ───
+    const cnUrl = process.env.CN_PANSOU_URL
+    if (cnUrl) {
+      ctx.logger.info(`pansou: 通过大陆微服务搜索 "${query}" → ${cnUrl}`)
+      try {
+        const res = await fetch(`${cnUrl}/search?q=${encodeURIComponent(query)}`, {
+          signal: ctx.signal,
+        })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const data = (await res.json()) as {
+          results: Hit[]
+          total: number
+          elapsedMs: number
+        }
+        ctx.logger.info(`pansou: 大陆微服务返回 ${data.total} 条 / ${data.elapsedMs}ms`)
+        return data.results || []
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        ctx.logger.warn(`pansou: 大陆微服务调用失败: ${msg}`)
+        return []
+      }
+    }
+
+    // ─── 本地 puppeteer 模式（无大陆微服务时的 fallback）───
     const useProxy = process.env.PANSOU_PROXY === '1'
-    ctx.logger.info(`pansou: 搜索 "${query}"，${PAN_SOURCES.length} 源并行渲染 (proxy=${useProxy})`)
+    ctx.logger.info(`pansou: 本地渲染 "${query}"，${PAN_SOURCES.length} 源 (proxy=${useProxy})`)
 
     // 代理模式：仅 PANSOU_PROXY=1 时启用（免费代理质量差，浏览器级别代理无 per-source 故障转移）
     let proxyHost: string | undefined
