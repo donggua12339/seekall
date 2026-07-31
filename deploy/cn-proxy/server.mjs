@@ -72,6 +72,31 @@ const EXTRACT_FN = `
     return 'unknown'
   }
 
+  // 根据 URL 域名检测实际来源
+  function detectSource(url) {
+    try {
+      const host = new URL(url).hostname.toLowerCase()
+      const rules = [
+        [/pan\.quark\.cn|quark\.cn|drive\.quark/i, '夸克网盘'],
+        [/pan\.baidu\.com|yun\.baidu|wangpan\.baidu/i, '百度网盘'],
+        [/alipan\.com|aliyundrive|drive\.aliyun/i, '阿里云盘'],
+        [/115\.com/i, '115网盘'],
+        [/pan\.xunlei|xunlei\.com/i, '迅雷云盘'],
+        [/cloud\.189\.cn/i, '天翼云盘'],
+        [/123pan\.com/i, '123云盘'],
+        [/weiyun\.com|yun\.qq\.com/i, '腾讯微云'],
+        [/pan\.360/i, '360云盘'],
+        [/drive\.google/i, 'Google Drive'],
+        [/onedrive\.live|sharepoint/i, 'OneDrive'],
+        [/mega\.nz/i, 'MEGA'],
+      ]
+      for (const [re, label] of rules) {
+        if (re.test(host) || re.test(url)) return label
+      }
+      return host.replace(/^www\./, '')
+    } catch { return 'unknown' }
+  }
+
   const cardSelectors = [
     '[class*="result"] [class*="item"]',
     '[class*="search"] [class*="item"]',
@@ -91,7 +116,7 @@ const EXTRACT_FN = `
     const snippetEl = card.querySelector('p, .desc, .summary, [class*="desc"], [class*="summary"], [class*="info"]')
     const snippet = snippetEl ? snippetEl.textContent.replace(/\\s+/g, ' ').trim().slice(0, 200) : ''
     seen.add(href)
-    results.push({ title, url: href, snippet, fileType: extractFileType(title + ' ' + snippet) })
+    results.push({ title, url: href, snippet, fileType: extractFileType(title + ' ' + snippet), detectedSource: detectSource(href) })
   })
 
   const panRe = /pan\\.baidu|pan\\.quark|alipan|115\\.com|weiyun|123pan|pan\\.xunlei|drive\\.google|cloud\\.189|pan\\.360/i
@@ -102,7 +127,7 @@ const EXTRACT_FN = `
       const title = a.textContent.replace(/\\s+/g, ' ').trim().slice(0, 200) || href
       if (title.length < 2) return
       seen.add(href)
-      results.push({ title, url: href, snippet: '', fileType: extractFileType(title) })
+      results.push({ title, url: href, snippet: '', fileType: extractFileType(title), detectedSource: detectSource(href) })
     }
   })
 
@@ -153,8 +178,8 @@ async function searchSource(b, source, query) {
         title: r.title,
         url: r.url,
         snippet: r.snippet || undefined,
-        source: source.label,
-        meta: { category: 'pan', panSource: source.id, fileType: r.fileType || 'unknown' },
+        source: r.detectedSource || source.label,
+        meta: { category: 'pan', panSource: source.id, fileType: r.fileType || 'unknown', detectedSource: r.detectedSource || source.label },
       })),
     }
   } catch (err) {
