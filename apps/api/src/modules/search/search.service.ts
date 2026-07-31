@@ -64,6 +64,57 @@ const CATEGORY_LABELS: Record<string, string> = {
   general: '综合',
 }
 
+/**
+ * 智能分类：根据标题 + URL 特征判断结果类别，
+ * 覆盖 greenhub/pansou 按域名硬编码的 category。
+ *
+ * 根因：greenhub 的 ghxi/423down 等域名所有结果（含文章）都标 software，
+ * pansou 的所有结果都标 pan，即使链接指向第三方文章站。
+ */
+function classifyHit(hit: SearchHit): string {
+  const title = hit.title || ''
+  const url = hit.url || ''
+
+  // 1. URL 匹配网盘域名 → pan
+  if (
+    /pan\.quark|pan\.baidu|alipan|aliyundrive|115\.com|123pan|weiyun|pan\.xunlei|cloud\.189|pan\.360|drive\.google|onedrive|mega\.nz/i.test(
+      url,
+    )
+  ) {
+    return 'pan'
+  }
+
+  // 2. 标题含游戏关键词 → game
+  if (
+    /游戏|game|galgame|steam|switch|dlc|mod|补丁|rom|汉化版|免安装版|破解版.*游戏|攻略|walkthrough|nsz|xci|nsp/i.test(
+      title,
+    )
+  ) {
+    return 'game'
+  }
+
+  // 3. 标题含动漫关键词 → anime
+  if (
+    /动漫|番剧|anime|manga|漫画|蓝光|bdrip|字幕组|\[anib\]|\[ani\]|episode|第\d+话|第\d+集.*动漫|新番/i.test(
+      title,
+    )
+  ) {
+    return 'anime'
+  }
+
+  // 4. 标题含软件特征 → software
+  if (
+    /v\d+\.\d+|绿色版|portable|便携版|直装版|免安装|注册机|激活工具|\.exe|\.apk|\.dmg|\.msi|破解版|crack|keygen|serial|repack|去广告|精简版|单文件/i.test(
+      title,
+    )
+  ) {
+    return 'software'
+  }
+
+  // 5. 无法判断 → general（不再错误继承源的硬编码分类）
+  return 'general'
+}
+
 /** 各规则超时（ms）：greenhub 快，pansou 需等 puppeteer 启动+渲染+提取 */
 const RULE_TIMEOUT: Record<string, number> = {
   greenhub: 20_000,
@@ -210,24 +261,47 @@ export class SearchService {
       return true
     })
 
+    // 智能分类：根据标题+URL 特征覆盖源硬编码的 category
+    for (const hit of deduped) {
+      if (hit.meta) {
+        hit.meta.category = classifyHit(hit)
+      }
+    }
+
     const elapsedMs = Date.now() - start
 
-    // 按域名聚合统计
-    const statMap = new Map<string, SourceStat>()
+    // 按域名聚合统计（category 用该域名下最多的分类）
+    const statMap = new Map<string, SourceStat & { catCounts: Map<string, number> }>()
     for (const hit of deduped) {
       const domain = hit.source || 'unknown'
       const category = (hit.meta?.category as string) || 'general'
       const stat = statMap.get(domain)
       if (stat) {
         stat.count += 1
+        stat.catCounts.set(category, (stat.catCounts.get(category) || 0) + 1)
       } else {
+        const catCounts = new Map<string, number>()
+        catCounts.set(category, 1)
         statMap.set(domain, {
           domain,
           label: SOURCE_LABELS[domain] || domain,
           category,
           count: 1,
+          catCounts,
         })
       }
+    }
+    // 每个域名取最多 hit 的 category
+    for (const stat of statMap.values()) {
+      let maxCat = 'general'
+      let maxCount = 0
+      for (const [cat, cnt] of stat.catCounts) {
+        if (cnt > maxCount) {
+          maxCat = cat
+          maxCount = cnt
+        }
+      }
+      stat.category = maxCat
     }
     const sources = [...statMap.values()].sort((a, b) => b.count - a.count)
 

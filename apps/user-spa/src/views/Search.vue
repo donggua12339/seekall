@@ -107,12 +107,13 @@ function exportCsv(scope: 'all' | 'filtered') {
   message.success(`已导出 ${rows.length} 条结果`)
 }
 
-// ── 分类聚合（用于筛选 chips）──
+// ── 分类聚合（直接从 results 的 meta.category 聚合，精确到每条结果）──
 const categories = computed(() => {
   if (!result.value) return []
   const map = new Map<string, number>()
-  for (const s of result.value.sources) {
-    map.set(s.category, (map.get(s.category) || 0) + s.count)
+  for (const h of result.value.results) {
+    const cat = (h.meta?.category as string) || 'general'
+    map.set(cat, (map.get(cat) || 0) + 1)
   }
   return [...map.entries()]
     .map(([key, count]) => ({ key, count, ...catMeta(key) }))
