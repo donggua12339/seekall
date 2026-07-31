@@ -5,22 +5,19 @@ services:
       dockerfile: apps/api/Dockerfile
     container_name: seekall-api
     restart: unless-stopped
-    networks:
-      seekall-net:
-        ipv4_address: 172.18.0.5  # 固定 IP（nginx 反代依赖）
+    # host 网络模式：API 需要访问宿主机上的 SSH 反向隧道端口（CN_PANSOU_URL）
+    # 副作用：Docker DNS 失效，mysql/redis/meilisearch 需用 127.0.0.1
+    network_mode: host
     env_file:
       - ../.env
     environment:
       - NODE_ENV=production
       - PORT=3000
-      # Docker 容器内 localhost 是自己，需用 service 名指向 mysql/meilisearch/redis
-      - DATABASE_URL=mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE}
-      - REDIS_URL=redis://redis:6379
-      - MEILISEARCH_URL=http://meilisearch:7700
-      # greenhub 大陆代理故障转移用的代理池文件（refresh 定期更新）
+      - DATABASE_URL=mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@127.0.0.1:3306/${MYSQL_DATABASE}
+      - REDIS_URL=redis://127.0.0.1:6379
+      - MEILISEARCH_URL=http://127.0.0.1:7700
       - PROXY_POOL_FILE=/app/proxy-pool.json
-      # 大陆代理微服务地址（pansou 优先调此服务，未设置则本地 puppeteer）
-      - CN_PANSOU_URL=${CN_PANSOU_URL:-}
+      - CN_PANSOU_URL=${CN_PANSOU_URL:-http://127.0.0.1:18787}
     volumes:
       # 代理池 JSON（只读挂载；文件必须先存在，否则 docker 会建成目录）
       - ../proxy-pool.json:/app/proxy-pool.json:ro
