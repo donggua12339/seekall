@@ -104,7 +104,7 @@ function classifyHit(hit: SearchHit): string {
 
   // 4. 标题含软件特征 → software
   if (
-    /v\d+\.\d+|绿色版|portable|便携版|直装版|免安装|注册机|激活工具|\.exe|\.apk|\.dmg|\.msi|破解版|crack|keygen|serial|repack|去广告|精简版|单文件/i.test(
+    /v?\d+\.\d+\.\d+|v\d+\.\d+|绿色|portable|便携|直装|免安装|注册|激活|\.exe|\.apk|\.dmg|\.msi|破解|crack|keygen|serial|repack|去广告|精简|单文件|优化版|高级版|专业版|企业版|旗舰版|完整版|装机版|特别版|修改版|增强版|multilingual/i.test(
       title,
     )
   ) {
