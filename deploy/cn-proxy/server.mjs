@@ -11,6 +11,8 @@
  */
 
 import http from 'node:http'
+import https from 'node:https'
+import net from 'node:net'
 import puppeteer from 'puppeteer-core'
 import { existsSync } from 'node:fs'
 
@@ -256,12 +258,44 @@ const server = http.createServer(async (req, res) => {
     return
   }
 
+  // HTTP 正向代理（undici ProxyAgent 对 HTTP 目标发普通请求，req.url 是完整 URL）
+  if (req.url.startsWith('http://') || req.url.startsWith('https://')) {
+    try {
+      const target = new URL(req.url)
+      const mod = target.protocol === 'https:' ? https : http
+      const headers = { ...req.headers, host: target.host }
+      delete headers['proxy-connection']
+      const proxyReq = mod.request(target, { method: req.method, headers }, (proxyRes) => {
+        res.writeHead(proxyRes.statusCode, proxyRes.headers)
+        proxyRes.pipe(res)
+      })
+      proxyReq.on('error', () => { if (!res.headersSent) res.writeHead(502); res.end() })
+      req.pipe(proxyReq)
+    } catch { if (!res.headersSent) res.writeHead(400); res.end() }
+    return
+  }
+
   res.writeHead(404)
   res.end('Not Found')
 })
 
+// HTTPS CONNECT 隧道（undici ProxyAgent 对 HTTPS 目标发 CONNECT）
+server.on('connect', (req, clientSocket, head) => {
+  const [host, portStr] = req.url.split(':')
+  const port = parseInt(portStr) || 443
+  const serverSocket = net.connect(port, host, () => {
+    clientSocket.write('HTTP/1.1 200 Connection Established\r\n\r\n')
+    if (head.length) serverSocket.write(head)
+    serverSocket.pipe(clientSocket)
+    clientSocket.pipe(serverSocket)
+  })
+  serverSocket.on('error', () => { try { clientSocket.end() } catch {} })
+  clientSocket.on('error', () => { try { serverSocket.end() } catch {} })
+  serverSocket.setTimeout(30000, () => { serverSocket.end(); clientSocket.end() })
+})
+
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`[cn-proxy] listening on :${PORT}`)
+  console.log(`[cn-proxy] listening on :${PORT} (pansou + HTTP proxy)`)
   console.log(`[cn-proxy] search: http://localhost:${PORT}/search?q=test`)
   console.log(`[cn-proxy] health: http://localhost:${PORT}/health`)
 })

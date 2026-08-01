@@ -28,11 +28,11 @@ const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
 
 /** 单源整体超时 ms（含直连 + 代理重试），硬上限，到点强制返回 */
-const SOURCE_TIMEOUT = 12_000
+const SOURCE_TIMEOUT = 20_000
 /** 直连超时（短，失败尽快转代理） */
-const DIRECT_TIMEOUT = 4_000
-/** 单个代理尝试超时 */
-const PROXY_TIMEOUT = 4_000
+const DIRECT_TIMEOUT = 3_000
+/** 单个代理尝试超时（SSH 隧道 + TLS 握手需要更多时间） */
+const PROXY_TIMEOUT = 8_000
 /** 最多尝试几个代理（多了会拖慢整体，免费代理死亡率高） */
 const MAX_PROXY_ATTEMPTS = 2
 /** 代理池缓存 TTL（到期重读文件，拿到刷新后的代理） */
