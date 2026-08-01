@@ -1,6 +1,6 @@
 {
   "name": "@seekall/rule-greenhub",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "SeekAll L2 规则 - 全网绿色资源聚合搜索（果核剥壳/423down/殁漂遥/乐软等）",
   "license": "MIT",
   "type": "module",

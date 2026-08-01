@@ -44,7 +44,9 @@ RUN pnpm install --no-frozen-lockfile --prod=false --ignore-scripts && \
 # 用 node 直接调 prisma build/index.js，避免 pnpm 9.0.0 在 alpine + hoisted 模式下
 # `pnpm exec prisma` 报 "Command prisma not found" 的 bug
 # schema 在 apps/api/prisma/，需显式 --schema 指向
-RUN node node_modules/prisma/build/index.js generate --schema=apps/api/prisma/schema.prisma
+RUN (node node_modules/prisma/build/index.js generate --schema=apps/api/prisma/schema.prisma || \
+  node node_modules/.prisma/client/node_modules/prisma/build/index.js generate --schema=apps/api/prisma/schema.prisma || \
+  npx --yes prisma generate --schema=apps/api/prisma/schema.prisma)
 
 # ── 拷贝源码 ──
 COPY apps/api/ ./apps/api/
