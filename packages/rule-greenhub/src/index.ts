@@ -230,7 +230,7 @@ function wpParse(source: string, maxItems = 15) {
     $(containers).each((_, el) => {
       const $el = $(el)
       const $a = $el
-        .find('h2 a, h3 a, .post-title a, .entry-title a, a.title, h4 a')
+        .find('h2 a, h3 a, .post-title a, .entry-title a, a.title, h4 a, span.title a, .title a, .post-title, .entry-title, h1 a, h5 a')
         .first()
       if (!$a.length) return
 
@@ -388,16 +388,63 @@ const SOURCES: Source[] = [
     buildUrl: (q) => `https://www.iplaysoft.com/?s=${encodeURIComponent(q)}`,
     parse: wpParse('iplaysoft.com'),
   },
+  {
+    id: 'macbl',
+    label: '马可菠萝',
+    category: 'software',
+    buildUrl: (q) => `https://www.macbl.com/?s=${encodeURIComponent(q)}`,
+    parse: (html): Hit[] => {
+      const $ = cheerio.load(html)
+      const hits: Hit[] = []
+      // macbl 用 span.title.title-h 包裹标题链接
+      $('span.title.title-h, .title.title-h, .post-title, .entry-title').each((_, el) => {
+        const $el = $(el)
+        const $a = $el.find('a').first().length ? $el.find('a').first() : $el.closest('a')
+        const title = $a.text().trim() || $el.text().trim()
+        let url = $a.attr('href') || $el.closest('a').attr('href') || ''
+        if (!title || !url || title.length < 3) return
+        if (url.startsWith('/')) url = `https://www.macbl.com${url}`
+        const snippet = $el.closest('.inner, .detail-header, article, .post, .item').find('p, .desc, .excerpt, .summary').first().text().trim().slice(0, 200)
+        hits.push({ title, url, snippet: snippet || undefined, source: 'macbl.com', meta: { category: 'software' } })
+      })
+      // fallback: 通用 WP 解析
+      if (hits.length === 0) return wpParse('macbl.com')(html)
+      return hits.slice(0, 15)
+    },
+  },
+
+  // ═══ Bing 通用搜索（通过大陆代理，覆盖全网）═══
+  {
+    id: 'bing',
+    label: 'Bing',
+    category: 'general',
+    buildUrl: (q) => `https://cn.bing.com/search?q=${encodeURIComponent(q)}&count=20`,
+    parse: (html): Hit[] => {
+      const $ = cheerio.load(html)
+      const hits: Hit[] = []
+      $('li.b_algo').each((_, el) => {
+        const $el = $(el)
+        const $a = $el.find('h2 a').first()
+        if (!$a.length) return
+        const title = $a.text().trim()
+        const url = $a.attr('href') || ''
+        if (!title || !url) return
+        const snippet = $el.find('.b_caption p, .b_lineclamp2, .b_paractl').first().text().trim().slice(0, 200)
+        hits.push({ title, url, snippet: snippet || undefined, source: 'bing.com', meta: { category: 'general' } })
+      })
+      return hits.slice(0, 20)
+    },
+  },
 ]
 
 // ─── 规则主体 ─────────────────────────────────────────────
 
 export const greenhubRule: Rule = {
   name: '@seekall/rule-greenhub',
-  version: '0.1.0',
+  version: '0.2.0',
   riskLevel: 3,
   description:
-    '全网绿色资源聚合搜索（自用）：绿色软件/游戏/动漫/综合，11 源并行',
+    '全网绿色资源聚合搜索（自用）：绿色软件/游戏/动漫/综合/Bing，13 源并行',
 
   async run(query: string, ctx: RuleContext): Promise<Hit[]> {
     ctx.logger.info(`greenhub: 搜索 "${query}"，${SOURCES.length} 源并行`)
