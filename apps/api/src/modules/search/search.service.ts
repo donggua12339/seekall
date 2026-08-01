@@ -84,7 +84,12 @@ function classifyHit(hit: SearchHit): string {
     return 'pan'
   }
 
-  // 2. 标题含游戏关键词 → game
+  // 2. URL 匹配动漫站域名 → anime（动漫花园/蜜柑等站的所有结果几乎都是动漫资源）
+  if (/dmhy\.org|mikanani\.me|acg\.rip|nyaa/i.test(url)) {
+    return 'anime'
+  }
+
+  // 3. 标题含游戏关键词 → game
   if (
     /游戏|game|galgame|steam|switch|dlc|mod|补丁|rom|汉化版|免安装版|破解版.*游戏|攻略|walkthrough|nsz|xci|nsp/i.test(
       title,
@@ -93,25 +98,32 @@ function classifyHit(hit: SearchHit): string {
     return 'game'
   }
 
-  // 3. 标题含动漫关键词 → anime
+  // 4. 标题含动漫关键词 → anime
   if (
-    /动漫|番剧|anime|manga|漫画|蓝光|bdrip|字幕组|\[anib\]|\[ani\]|episode|第\d+话|第\d+集.*动漫|新番/i.test(
+    /动漫|番剧|anime|manga|漫画|蓝光|bdrip|字幕组|\[anib\]|\[ani\]|episode|第\d+话|第\d+集.*动漫|新番|萝莉|cosplay|coser|同人/i.test(
       title,
     )
   ) {
     return 'anime'
   }
 
-  // 4. 标题含软件特征 → software
+  // 5. 文章/教程排除 — 标题含这些词说明是文章而非软件下载
+  const isArticle =
+    /教程|如何|怎么|评测|使用感受|使用体验|介绍|测评|开箱|新闻|资讯|文章|阅读|浏览|感受|反应|历史|回顾|盘点|对比|推荐.*软件|软件.*推荐|软件.*介绍/i.test(
+      title,
+    )
+
+  // 6. 标题含软件特征 → software（但排除文章）
   if (
-    /v?\d+\.\d+\.\d+|v\d+\.\d+|绿色|portable|便携|直装|免安装|注册|激活|\.exe|\.apk|\.dmg|\.msi|破解|crack|keygen|serial|repack|去广告|精简|单文件|优化版|高级版|专业版|企业版|旗舰版|完整版|装机版|特别版|修改版|增强版|multilingual/i.test(
+    !isArticle &&
+    /v?\d+\.\d+\.\d+|v\d+\.\d+|绿色|portable|便携|直装|免安装|注册|激活|\.exe|\.apk|\.dmg|\.msi|破解|crack|keygen|serial|序列号|repack|去广告|精简|单文件|优化版|高级版|专业版|企业版|旗舰版|完整版|装机版|特别版|修改版|增强版|multilingual|中文版|正式版|授权版|下载|套装|插件/i.test(
       title,
     )
   ) {
     return 'software'
   }
 
-  // 5. 无法判断 → general（不再错误继承源的硬编码分类）
+  // 7. 无法判断 → general
   return 'general'
 }
 
