@@ -11,6 +11,7 @@
     "test": "pnpm -r run test",
     "format": "prettier --write \"**/*.{ts,tsx,vue,js,json,md}\"",
     "prepare": "husky install",
+    "db:gen": "pnpm --filter @seekall/api run prisma:generate",
     "clean": "pnpm -r run clean && rm -rf node_modules"
   },
   "devDependencies": {

@@ -315,12 +315,15 @@ curl http://172.18.0.7/health
 3. **LXD 嵌套容器 docker exec breakout** - `docker exec CMD` 形式报 "container breakout detected"
    - 解决: healthcheck 改用 `CMD-SHELL`(redis/mysql 已修)
 4. **lint-staged 路径含空格** - "Claude Code Haha" 路径含空格,ESLint 报 "No files matching pattern"
-   - 解决: `.lintstagedrc.cjs` 用函数形式 + `quote()` 包引号 + 排除 apps/admin / apps/docs-site / packages
+   - 【2026-08-03 已搬离】项目已从含空格的 "Claude Code Haha" 目录搬到 `D:/projects/seekall`(无空格),此坑根因已消除;下方 quote() 方案保留无害
+   - 解决(历史): `.lintstagedrc.cjs` 用函数形式 + `quote()` 包引号 + 排除 apps/admin / apps/docs-site / packages
 5. **v0.5 不在 /opt/seekall-v0.5/.git** - 服务器上的 /opt/seekall-v0.5 是从 home seekall cp 来的,git 历史在 ~/seekall
 6. **Prisma JsonFilter 不支持 path+equals** - 改用 findMany 后端 `.filter()` 处理
 7. **AdminAuditLog.targetId 可空** - findMany 后必须 `.filter((x): x is bigint => x !== null)`
 8. **commitlint subject 大写报错** - subject 必须小写,footer 行宽 ≤100
 9. **ESM shebang 不工作** - Node ESM 解析报错,SDK CLI 不加 banner,由 npm bin 字段处理
+10. **hoisted 布局下 install 不自动跑 prisma generate** - `.npmrc` 用 `node-linker=hoisted`(解 Windows 7-zip/CC 扫 node_modules 报错,详见 memory feedback_pnpm_windows_hoisted)。但 hoisted 下 `pnpm install` **不会**自动触发 `@prisma/client` 的 generate,导致根 `@prisma/client` 是空壳,`nest build` 报上百条 `Property 'xxx' does not exist on type 'PrismaService'`。
+    - 解决: install 后跑一次 `pnpm db:gen`(= `pnpm --filter @seekall/api run prisma:generate`),或 `cd apps/api && npx prisma generate`。generate 后再 build/test 即正常。每次 `git clone` + `pnpm install` 后都要记得跑这条。
 
 ## v0.5 已完成里程碑
 
