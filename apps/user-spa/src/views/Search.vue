@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { NButton, NHighlight, NSkeleton, NEmpty, NCheckbox } from 'naive-ui'
 import { useMessage } from 'naive-ui'
 import { searchApi, type SearchResult, type SearchHit } from '@/api/search'
@@ -22,11 +22,25 @@ const activeCategory = ref<string>('all')
 const activeFileType = ref<string>('all') // 文件类型过滤（仅网盘结果有效）
 const includePan = ref(false) // 网盘搜索开关（puppeteer 慢，默认关）
 
-const HOT_SEARCHES = [
+// 静态兜底列表：后端热搜词为空（冷启动/Redis 异常）时展示
+const HOT_FALLBACK = [
   'Photoshop', 'WPS', 'Office 2024', '剪映',
   '考研资料', '四级', '我的世界', '间谍过家家',
   'ATRI', '小说合集', '电子书', 'Python教程',
 ]
+// 实际渲染的热搜词（动态，后端拉取失败/为空则回落静态）
+const hotWords = ref<string[]>(HOT_FALLBACK)
+
+onMounted(async () => {
+  try {
+    const list = await searchApi.hot()
+    if (list && list.length) {
+      hotWords.value = list.map((h) => h.word)
+    }
+  } catch {
+    // 静默回落静态列表
+  }
+})
 
 const CATEGORY_META: Record<string, { label: string; color: string }> = {
   software: { label: '软件', color: '#0e9f6e' },
@@ -231,7 +245,7 @@ function openUrl(url: string) {
       <!-- 初始态：热门搜索 -->
       <div v-if="state === 'idle'" class="hot">
         <span class="hot-label">试试：</span>
-        <button v-for="h in HOT_SEARCHES" :key="h" class="hot-chip" @click="pickHot(h)">
+        <button v-for="h in hotWords" :key="h" class="hot-chip" @click="pickHot(h)">
           {{ h }}
         </button>
       </div>

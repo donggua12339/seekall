@@ -1,5 +1,7 @@
-import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
+import { Inject, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
 import { PrismaService } from '../../database/prisma.service'
+import { REDIS_CLIENT } from '../../database/redis.module'
+import type { Redis } from 'ioredis'
 import { RuleStatus } from '@prisma/client'
 
 /** 单条搜索结果 */
@@ -133,6 +135,15 @@ const RULE_TIMEOUT: Record<string, number> = {
   pansou: 25_000,
 }
 
+/** 热搜词统计（Redis ZSET） */
+const HOT_KEY = 'seekall:hot:words'
+/** 同用户同词去重窗口（秒），防单人刷词 */
+const HOT_DEDUP_TTL = 3600
+/** ZSET 最多保留多少词，超出裁掉低频尾部 */
+const HOT_MAX_WORDS = 5000
+/** 搜索词记录的长度上限（超长词没有统计意义） */
+const HOT_QUERY_MAX_LEN = 30
+
 /** 规则包定义 */
 const RULE_DEFS = {
   greenhub: { specifier: '@seekall/rule-greenhub', exportName: 'greenhubRule' },
@@ -166,7 +177,50 @@ export class SearchService {
   private readonly logger = new Logger(SearchService.name)
   private ruleCache = new Map<string, Promise<LoadedRule>>()
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(REDIS_CLIENT) private readonly redis: Redis,
+  ) {}
+
+  /**
+   * 记录搜索词到 Redis ZSET（热搜词统计）。
+   * 同一用户同一词 HOT_DEDUP_TTL 秒内只计一次，防单人刷词。
+   * 静默失败，绝不影响搜索主流程。
+   */
+  private recordHotWord(query: string, userId?: bigint): void {
+    const word = query.trim().toLowerCase()
+    if (!word || word.length > HOT_QUERY_MAX_LEN) return
+
+    const dedupKey = `seekall:hot:dedup:${userId ?? 'anon'}:${word}`
+    this.redis
+      .set(dedupKey, '1', 'EX', HOT_DEDUP_TTL, 'NX')
+      .then((res) => {
+        if (res !== 'OK') return // 窗口内已计过
+        return this.redis.zincrby(HOT_KEY, 1, word).then(async () => {
+          const size = await this.redis.zcard(HOT_KEY)
+          if (size > HOT_MAX_WORDS) {
+            // 裁掉低频尾部，保留 top HOT_MAX_WORDS
+            await this.redis.zremrangebyrank(HOT_KEY, 0, size - HOT_MAX_WORDS - 1)
+          }
+        })
+      })
+      .catch((err) => this.logger.warn(`记录热搜词失败: ${(err as Error).message}`))
+  }
+
+  /** 取热搜词 top N（按次数降序）；Redis 异常时返回空数组 */
+  async hotWords(limit = 12): Promise<Array<{ word: string; count: number }>> {
+    try {
+      const rows = await this.redis.zrevrange(HOT_KEY, 0, limit - 1, 'WITHSCORES')
+      const out: Array<{ word: string; count: number }> = []
+      for (let i = 0; i + 1 < rows.length; i += 2) {
+        out.push({ word: rows[i], count: Number(rows[i + 1]) })
+      }
+      return out
+    } catch (err) {
+      this.logger.warn(`读取热搜词失败: ${(err as Error).message}`)
+      return []
+    }
+  }
 
   /** 懒加载 + 缓存单个规则模块 */
   private loadRule(key: keyof typeof RULE_DEFS): Promise<LoadedRule> {
@@ -263,6 +317,9 @@ export class SearchService {
     if (results.length === 0) {
       throw new ServiceUnavailableException('搜索服务暂不可用，请稍后重试')
     }
+
+    // 热搜词统计（fire-and-forget，只统计有结果的搜索）
+    this.recordHotWord(trimmed, userId)
 
     // 按 url 去重（不同规则可能命中同一资源）
     const seen = new Set<string>()

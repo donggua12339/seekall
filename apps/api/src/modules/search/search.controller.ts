@@ -33,4 +33,12 @@ export class SearchController {
       userId ? BigInt(userId) : undefined,
     )
   }
+
+  @Public()
+  @Get('hot')
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  @ApiOperation({ summary: '热门搜索词 top N（免登录）' })
+  hotWords() {
+    return this.searchService.hotWords(12)
+  }
 }

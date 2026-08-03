@@ -23,6 +23,11 @@ export interface SearchResult {
   results: SearchHit[]
 }
 
+export interface HotWord {
+  word: string
+  count: number
+}
+
 export const searchApi = {
   search: (q: string, opts?: { pansou?: boolean }) =>
     http.get<unknown, SearchResult>('/search', {
@@ -30,4 +35,5 @@ export const searchApi = {
       // pansou 开启时放宽超时（puppeteer 慢）
       timeout: opts?.pansou ? 35_000 : 25_000,
     }),
+  hot: () => http.get<unknown, HotWord[]>('/search/hot', { timeout: 5_000 }),
 }
