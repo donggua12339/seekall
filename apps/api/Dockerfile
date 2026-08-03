@@ -34,19 +34,34 @@ COPY apps/api/prisma ./apps/api/prisma/
 # --no-frozen-lockfile：根 lockfile 与 workspace 结构 reconcile
 # --prod=false：装 devDeps（nest cli / tsup / typescript / prisma），构建需要
 # --ignore-scripts：跳过 esbuild postinstall 的 binary 校验（CDN 偶发版本错配），下面显式 rebuild
+# 2026-08-04 事故根因：旧写法 `install && prune || true && rebuild || true` 的
+# shell 优先级会把 install 失败吞掉（install 挂了层照样"成功"且无 node_modules，缓存成毒层）。
+# 现改为 install 失败必须炸层；prune/rebuild 的容错用子 shell 括号限定范围。
 RUN pnpm install --no-frozen-lockfile --prod=false --ignore-scripts && \
-  # 清空 pnpm store 强制 esbuild 重新下载匹配版本的 binary（避免 store 残留版本错配）
-  pnpm store prune || true && \
-  # 显式重建 esbuild（拉匹配的 binary）
-  pnpm rebuild esbuild || true
+  (pnpm store prune || true) && \
+  (pnpm rebuild esbuild || true) && \
+  test -f node_modules/.modules.yaml && \
+  echo INSTALL_LAYOUT_OK
 
 # ── 生成 Prisma Client ──
-# 用 node 直接调 prisma build/index.js，避免 pnpm 9.0.0 在 alpine + hoisted 模式下
-# `pnpm exec prisma` 报 "Command prisma not found" 的 bug
-# schema 在 apps/api/prisma/，需显式 --schema 指向
-RUN (node node_modules/prisma/build/index.js generate --schema=apps/api/prisma/schema.prisma || \
-  node node_modules/.prisma/client/node_modules/prisma/build/index.js generate --schema=apps/api/prisma/schema.prisma || \
-  npx --yes prisma generate --schema=apps/api/prisma/schema.prisma)
+# 2026-08-04 事故：hoisted install 后 node_modules/prisma 可能缺失，
+# 旧 fallback `npx --yes prisma` 会拉最新 prisma 7.x，其 schema 校验不兼容 5.x 的
+# `url = env(...)` 写法导致 build 失败。现改为：多路径探测 + 缺则显式装锁定版本 5.22.0。
+RUN set -ex; \
+  echo "== diag: node_modules 布局 =="; \
+  ls node_modules | wc -l; \
+  ls node_modules/.bin 2>/dev/null | grep -E "^(prisma|nest|tsup|tsc)$" || echo "NO_ROOT_BINS"; \
+  ls apps/api/node_modules 2>/dev/null | head -20 || echo "NO_API_NODE_MODULES"; \
+  echo "== prisma generate =="; \
+  if [ -f node_modules/prisma/build/index.js ]; then \
+    node node_modules/prisma/build/index.js generate --schema=apps/api/prisma/schema.prisma; \
+  elif [ -f apps/api/node_modules/prisma/build/index.js ]; then \
+    node apps/api/node_modules/prisma/build/index.js generate --schema=apps/api/prisma/schema.prisma; \
+  else \
+    echo "prisma CLI 缺失，显式安装锁定版本 5.22.0 到 workspace 根"; \
+    pnpm add -w -D prisma@5.22.0 --ignore-scripts; \
+    node node_modules/prisma/build/index.js generate --schema=apps/api/prisma/schema.prisma; \
+  fi
 
 # ── 拷贝源码 ──
 COPY apps/api/ ./apps/api/
@@ -102,4 +117,6 @@ EXPOSE 3000
 
 # 启动前同步 schema 到数据库（migrations 目录不全，用 db push 补齐）
 # --accept-data-loss 允许删除 0_init 中残留的失败索引；首次部署用，后续迁移应改用 migrate deploy
-CMD ["sh", "-c", "npx prisma db push --skip-generate --accept-data-loss && node dist/main.js"]
+# 注意：绝不用裸 `npx prisma`——本地缺 CLI 时它会拉 prisma 7.x，schema 校验不兼容直接启动失败。
+# 优先用 node_modules 里的锁定版本，兜底也必须带 @5.22.0 版本号。
+CMD ["sh", "-c", "(node node_modules/prisma/build/index.js db push --skip-generate --accept-data-loss || npx --yes prisma@5.22.0 db push --skip-generate --accept-data-loss) && node dist/main.js"]
