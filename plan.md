@@ -172,8 +172,8 @@
 
 ### P2 运营内容
 
-- [ ] 首页热门资源榜（50 条）（阻塞：无资源索引库）
-- [ ] 首页最新入库（50 条）（阻塞：无资源索引库）
+- [x] 首页热门资源榜（2026-08-05：MeiliSearch resources 索引 + GET /api/v1/resources/hot，搜索页 idle 态展示 top8）
+- [x] 首页最新入库（2026-08-05：GET /api/v1/resources/latest，按 firstSeenAt 降序）
 - [x] 热门搜索词从后端动态获取（2026-08-04：Redis ZSET + GET /api/v1/search/hot）
 
 ### P3 社区
