@@ -2,7 +2,9 @@
  * @seekall/rule-pansou - 网盘资源搜索（无头浏览器渲染 CSR 网盘搜索站）
  *
  * 风险评级：L3（自用）
- * 数据源：7 个网盘搜索站（夸克 / UP云搜 / 阿里云盘搜 / 我的盘 / 盘搜Pro / 迅雷搜 / 天翼搜）
+ * 数据源（2026-08-04 实测）：
+ * - 大陆微服务模式（CN_PANSOU_URL）：4 源（夸克 / UP云搜 / 猫狸盘搜 / 大力盘）
+ * - 本地 puppeteer fallback：2 源（夸克 / UP云搜，仅这两个 HK 直连可达）
  *
  * 代理故障转移：HK 服务器直连国内站可能超时，自动走大陆代理。
  * 每次搜索临时 launch 浏览器、结束即 close（4GB 服务器避免常驻吃内存）；
@@ -208,26 +210,37 @@ export const pansouRule: Rule = {
 
   async run(query: string, ctx: RuleContext): Promise<Hit[]> {
     // ─── 大陆微服务模式：CN_PANSOU_URL 设置时，调远程服务获取结果 ───
+    // 支持故障转移：CN_PANSOU_FALLBACK_URLS（逗号分隔）依次兜底；
+    // 全部失败才回落本地 puppeteer（2026-08-04：此前单 URL 失败直接返回 []，隧道一断网盘搜索全哑）
     const cnUrl = process.env.CN_PANSOU_URL
     if (cnUrl) {
-      ctx.logger.info(`pansou: 通过大陆微服务搜索 "${query}" → ${cnUrl}`)
-      try {
-        const res = await fetch(`${cnUrl}/search?q=${encodeURIComponent(query)}`, {
-          signal: ctx.signal,
-        })
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const data = (await res.json()) as {
-          results: Hit[]
-          total: number
-          elapsedMs: number
+      const fallbacks = (process.env.CN_PANSOU_FALLBACK_URLS || '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+      const urls = [cnUrl, ...fallbacks]
+      for (const u of urls) {
+        if (ctx.signal.aborted) return []
+        ctx.logger.info(`pansou: 通过大陆微服务搜索 "${query}" → ${u}`)
+        try {
+          // 单地址限时 12s，给后续兜底地址留时间（外层 RULE_TIMEOUT 30s 总闸）
+          const res = await fetch(`${u}/search?q=${encodeURIComponent(query)}`, {
+            signal: AbortSignal.any([ctx.signal, AbortSignal.timeout(12_000)]),
+          })
+          if (!res.ok) throw new Error(`HTTP ${res.status}`)
+          const data = (await res.json()) as {
+            results: Hit[]
+            total: number
+            elapsedMs: number
+          }
+          ctx.logger.info(`pansou: 大陆微服务返回 ${data.total} 条 / ${data.elapsedMs}ms`)
+          return data.results || []
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err)
+          ctx.logger.warn(`pansou: 大陆微服务 ${u} 失败: ${msg}`)
         }
-        ctx.logger.info(`pansou: 大陆微服务返回 ${data.total} 条 / ${data.elapsedMs}ms`)
-        return data.results || []
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err)
-        ctx.logger.warn(`pansou: 大陆微服务调用失败: ${msg}`)
-        return []
       }
+      ctx.logger.warn('pansou: 所有大陆微服务地址失败，回落本地渲染')
     }
 
     // ─── 本地 puppeteer 模式（无大陆微服务时的 fallback）───

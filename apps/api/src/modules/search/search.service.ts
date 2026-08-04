@@ -129,10 +129,10 @@ function classifyHit(hit: SearchHit): string {
   return 'general'
 }
 
-/** 各规则超时（ms）：greenhub 快，pansou 需等 puppeteer 启动+渲染+提取 */
+/** 各规则超时（ms）：greenhub 快，pansou 走大陆微服务含隧道故障转移，给足 30s */
 const RULE_TIMEOUT: Record<string, number> = {
   greenhub: 20_000,
-  pansou: 25_000,
+  pansou: 30_000,
 }
 
 /** 热搜词统计（Redis ZSET） */

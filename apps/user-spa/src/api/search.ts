@@ -32,8 +32,8 @@ export const searchApi = {
   search: (q: string, opts?: { pansou?: boolean }) =>
     http.get<unknown, SearchResult>('/search', {
       params: { q, pansou: opts?.pansou ? '1' : '0' },
-      // pansou 开启时放宽超时（puppeteer 慢）
-      timeout: opts?.pansou ? 35_000 : 25_000,
+      // pansou 开启时放宽超时（大陆微服务 + 隧道故障转移）
+      timeout: opts?.pansou ? 40_000 : 25_000,
     }),
   hot: () => http.get<unknown, HotWord[]>('/search/hot', { timeout: 5_000 }),
 }

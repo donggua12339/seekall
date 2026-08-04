@@ -212,7 +212,7 @@ function openUrl(url: string) {
       <div class="wordmark">
         <span class="radar" aria-hidden="true"><i /><i /><i /></span>
         <h1 class="brand">觅源</h1>
-        <p class="tagline">SEEKALL · 全网绿色资源聚合搜索 · 11 源并行</p>
+        <p class="tagline">SEEKALL · 全网绿色资源聚合搜索 · 13 源并行</p>
       </div>
 
       <div class="searchbar">
@@ -257,7 +257,7 @@ function openUrl(url: string) {
       <div v-if="state === 'loading'" class="loading">
         <div class="loading-status">
           <span class="dot-pulse"><i /><i /><i /></span>
-          正在并行检索 {{ includePan ? '13' : '11' }} 个资源站…
+          正在并行检索 {{ includePan ? '17' : '13' }} 个资源站…
         </div>
         <div v-for="n in 6" :key="n" class="skeleton-card">
           <NSkeleton height="20px" width="60%" />

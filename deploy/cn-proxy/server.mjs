@@ -139,6 +139,9 @@ const EXTRACT_FN = `
 
 // ─── 搜索源定义 ──────────────────────────────────────────
 
+// 2026-08-04 扩源：从大陆服务器实测可达性后确定 4 源（原 7 源中 wodepan/pansou/
+// xunleisou/tianyisou 域名已死；wpssc 域名待售；pansou.cc 搜索路由不明）。
+// alipansou 大陆直连 200（HK 直连 403），dalipan 为百度盘资源 SPA（hash 路由）。
 const SOURCES = [
   {
     id: 'quark',
@@ -151,6 +154,18 @@ const SOURCES = [
     label: 'UP云搜',
     buildUrl: (q) => `https://www.upyunso.com/search?q=${encodeURIComponent(q)}`,
     waitSelector: '[class*="result"], [class*="item"], [class*="card"]',
+  },
+  {
+    id: 'alipansou',
+    label: '猫狸盘搜',
+    buildUrl: (q) => `https://www.alipansou.com/search?k=${encodeURIComponent(q)}`,
+    waitSelector: '[class*="result"], [class*="item"], [class*="card"], .list',
+  },
+  {
+    id: 'dalipan',
+    label: '大力盘',
+    buildUrl: (q) => `https://www.dalipan.com/#/main?keyword=${encodeURIComponent(q)}`,
+    waitSelector: '[class*="result"], [class*="item"], [class*="list"], .el-card',
   },
 ]
 
