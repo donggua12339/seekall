@@ -3,6 +3,7 @@ import { PrismaService } from '../../database/prisma.service'
 import { REDIS_CLIENT } from '../../database/redis.module'
 import type { Redis } from 'ioredis'
 import { RuleStatus } from '@prisma/client'
+import { ResourcesService } from '../resources/resources.service'
 
 /** 单条搜索结果 */
 export interface SearchHit {
@@ -180,6 +181,7 @@ export class SearchService {
   constructor(
     private readonly prisma: PrismaService,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
+    private readonly resources: ResourcesService,
   ) {}
 
   /**
@@ -336,6 +338,9 @@ export class SearchService {
         hit.meta.category = classifyHit(hit)
       }
     }
+
+    // 搜索结果沉淀进资源索引（fire-and-forget，供热门榜/最新入库）
+    this.resources.indexHits(deduped)
 
     const elapsedMs = Date.now() - start
 

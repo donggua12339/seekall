@@ -2,7 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { NButton, NHighlight, NSkeleton, NEmpty, NCheckbox } from 'naive-ui'
 import { useMessage } from 'naive-ui'
-import { searchApi, type SearchResult, type SearchHit } from '@/api/search'
+import { searchApi, type SearchResult, type SearchHit, type ResourceItem } from '@/api/search'
 import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
@@ -31,6 +31,10 @@ const HOT_FALLBACK = [
 // 实际渲染的热搜词（动态，后端拉取失败/为空则回落静态）
 const hotWords = ref<string[]>(HOT_FALLBACK)
 
+// 资源榜单（热门 / 最新入库，MeiliSearch 沉淀，空则不展示）
+const hotResources = ref<ResourceItem[]>([])
+const latestResources = ref<ResourceItem[]>([])
+
 onMounted(async () => {
   try {
     const list = await searchApi.hot()
@@ -40,7 +44,22 @@ onMounted(async () => {
   } catch {
     // 静默回落静态列表
   }
+  // 榜单独立拉取，失败静默隐藏
+  try {
+    hotResources.value = (await searchApi.resourcesHot(8)) || []
+  } catch {
+    hotResources.value = []
+  }
+  try {
+    latestResources.value = (await searchApi.resourcesLatest(8)) || []
+  } catch {
+    latestResources.value = []
+  }
 })
+
+function openResource(url: string) {
+  window.open(url, '_blank', 'noopener,noreferrer')
+}
 
 const CATEGORY_META: Record<string, { label: string; color: string }> = {
   software: { label: '软件', color: '#0e9f6e' },
@@ -391,6 +410,40 @@ function openUrl(url: string) {
           <div class="hint-item hint-clickable" @click="pickCategory('game')"><span class="hint-ico">🎮</span><b>游戏</b>Galgame / 单机资源</div>
           <div class="hint-item hint-clickable" @click="pickCategory('anime')"><span class="hint-ico">🌸</span><b>动漫</b>番剧 / 花园 / 蜜柑</div>
           <div class="hint-item hint-clickable" @click="pickCategory('pan')"><span class="hint-ico">☁️</span><b>网盘</b>夸克 / 阿里云盘 / 百度</div>
+        </div>
+
+        <!-- 资源榜单：热门 / 最新入库（MeiliSearch 沉淀，无数据则隐藏） -->
+        <div v-if="hotResources.length || latestResources.length" class="boards">
+          <div v-if="hotResources.length" class="board">
+            <div class="board-head"><span class="board-ico">🔥</span>热门资源</div>
+            <button
+              v-for="(r, i) in hotResources"
+              :key="r.id"
+              class="board-item"
+              @click="openResource(r.url)"
+            >
+              <span class="board-rank" :class="{ top: i < 3 }">{{ i + 1 }}</span>
+              <span class="board-title">{{ r.title }}</span>
+              <span v-if="r.category" class="board-cat" :style="{ color: catMeta(r.category).color }">
+                {{ catMeta(r.category).label }}
+              </span>
+            </button>
+          </div>
+
+          <div v-if="latestResources.length" class="board">
+            <div class="board-head"><span class="board-ico">🆕</span>最新入库</div>
+            <button
+              v-for="r in latestResources"
+              :key="r.id"
+              class="board-item"
+              @click="openResource(r.url)"
+            >
+              <span class="board-title">{{ r.title }}</span>
+              <span v-if="r.category" class="board-cat" :style="{ color: catMeta(r.category).color }">
+                {{ catMeta(r.category).label }}
+              </span>
+            </button>
+          </div>
         </div>
       </div>
     </main>
@@ -915,6 +968,76 @@ function openUrl(url: string) {
 .hint-ico {
   font-size: 26px;
 }
+
+/* ── 资源榜单 ── */
+.boards {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+  margin-top: 14px;
+}
+.board {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 16px 16px 8px;
+}
+.board-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+.board-ico {
+  font-size: 16px;
+}
+.board-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 6px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.board-item:hover {
+  background: rgba(14, 159, 110, 0.08);
+}
+.board-item:hover .board-title {
+  color: var(--green);
+}
+.board-rank {
+  flex-shrink: 0;
+  width: 18px;
+  font-family: 'Fira Code', monospace;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+.board-rank.top {
+  color: var(--green);
+  font-weight: 700;
+}
+.board-title {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 0.15s;
+}
+.board-cat {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+}
 .no-filter {
   padding: 40px 0;
 }
@@ -923,5 +1046,6 @@ function openUrl(url: string) {
   .brand { font-size: 48px; }
   .hero.compact .brand { font-size: 34px; }
   .hint-grid { grid-template-columns: 1fr; }
+  .boards { grid-template-columns: 1fr; }
 }
 </style>

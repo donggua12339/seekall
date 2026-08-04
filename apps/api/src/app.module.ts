@@ -14,6 +14,7 @@ import { LicenseModule } from './modules/license/license.module'
 import { DmcaModule } from './modules/dmca/dmca.module'
 import { HealthModule } from './modules/health/health.module'
 import { SearchModule } from './modules/search/search.module'
+import { ResourcesModule } from './modules/resources/resources.module'
 import { MailModule } from './modules/mail/mail.module'
 import { envValidation } from './config/env.validation'
 
@@ -64,6 +65,7 @@ import { envValidation } from './config/env.validation'
     LicenseModule,
     DmcaModule,
     SearchModule,
+    ResourcesModule,
     HealthModule,
   ],
   providers: [

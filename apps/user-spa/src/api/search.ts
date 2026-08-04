@@ -28,6 +28,20 @@ export interface HotWord {
   count: number
 }
 
+/** 资源库条目（热门榜 / 最新入库） */
+export interface ResourceItem {
+  id: string
+  title: string
+  url: string
+  snippet?: string
+  source?: string
+  category?: string
+  fileType?: string
+  firstSeenAt?: string
+  lastSeenAt?: string
+  hitCount?: number
+}
+
 export const searchApi = {
   search: (q: string, opts?: { pansou?: boolean }) =>
     http.get<unknown, SearchResult>('/search', {
@@ -36,4 +50,8 @@ export const searchApi = {
       timeout: opts?.pansou ? 40_000 : 25_000,
     }),
   hot: () => http.get<unknown, HotWord[]>('/search/hot', { timeout: 5_000 }),
+  resourcesHot: (limit = 8) =>
+    http.get<unknown, ResourceItem[]>('/resources/hot', { params: { limit }, timeout: 5_000 }),
+  resourcesLatest: (limit = 8) =>
+    http.get<unknown, ResourceItem[]>('/resources/latest', { params: { limit }, timeout: 5_000 }),
 }
