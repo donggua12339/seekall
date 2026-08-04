@@ -34,6 +34,33 @@ const hotWords = ref<string[]>(HOT_FALLBACK)
 // 资源榜单（热门 / 最新入库，MeiliSearch 沉淀，空则不展示）
 const hotResources = ref<ResourceItem[]>([])
 const latestResources = ref<ResourceItem[]>([])
+// 最新入库板是否已加载过（加载后固定显示，切 range 出空也不隐藏整板）
+const latestLoaded = ref(false)
+// 最新入库时间范围
+const latestRange = ref<'all' | 'today' | 'week' | 'month' | 'year'>('all')
+const RANGE_OPTIONS: Array<{ key: typeof latestRange.value; label: string }> = [
+  { key: 'all', label: '全部' },
+  { key: 'today', label: '今天' },
+  { key: 'week', label: '一周' },
+  { key: 'month', label: '一月' },
+  { key: 'year', label: '一年' },
+]
+
+async function loadLatest() {
+  try {
+    latestResources.value = (await searchApi.resourcesLatest(8, latestRange.value)) || []
+  } catch {
+    latestResources.value = []
+  } finally {
+    latestLoaded.value = true
+  }
+}
+
+function pickRange(key: typeof latestRange.value) {
+  if (latestRange.value === key) return
+  latestRange.value = key
+  loadLatest()
+}
 
 onMounted(async () => {
   try {
@@ -50,11 +77,7 @@ onMounted(async () => {
   } catch {
     hotResources.value = []
   }
-  try {
-    latestResources.value = (await searchApi.resourcesLatest(8)) || []
-  } catch {
-    latestResources.value = []
-  }
+  loadLatest()
 })
 
 function openResource(url: string) {
@@ -413,7 +436,7 @@ function openUrl(url: string) {
         </div>
 
         <!-- 资源榜单：热门 / 最新入库（MeiliSearch 沉淀，无数据则隐藏） -->
-        <div v-if="hotResources.length || latestResources.length" class="boards">
+        <div v-if="hotResources.length || latestLoaded" class="boards">
           <div v-if="hotResources.length" class="board">
             <div class="board-head"><span class="board-ico">🔥</span>热门资源</div>
             <button
@@ -430,19 +453,33 @@ function openUrl(url: string) {
             </button>
           </div>
 
-          <div v-if="latestResources.length" class="board">
+          <div v-if="latestLoaded" class="board">
             <div class="board-head"><span class="board-ico">🆕</span>最新入库</div>
-            <button
-              v-for="r in latestResources"
-              :key="r.id"
-              class="board-item"
-              @click="openResource(r.url)"
-            >
-              <span class="board-title">{{ r.title }}</span>
-              <span v-if="r.category" class="board-cat" :style="{ color: catMeta(r.category).color }">
-                {{ catMeta(r.category).label }}
-              </span>
-            </button>
+            <div class="range-row">
+              <button
+                v-for="opt in RANGE_OPTIONS"
+                :key="opt.key"
+                class="range-chip"
+                :class="{ active: latestRange === opt.key }"
+                @click="pickRange(opt.key)"
+              >
+                {{ opt.label }}
+              </button>
+            </div>
+            <template v-if="latestResources.length">
+              <button
+                v-for="r in latestResources"
+                :key="r.id"
+                class="board-item"
+                @click="openResource(r.url)"
+              >
+                <span class="board-title">{{ r.title }}</span>
+                <span v-if="r.category" class="board-cat" :style="{ color: catMeta(r.category).color }">
+                  {{ catMeta(r.category).label }}
+                </span>
+              </button>
+            </template>
+            <div v-else class="board-empty">该时间范围内暂无新入库资源</div>
           </div>
         </div>
       </div>
@@ -993,6 +1030,36 @@ function openUrl(url: string) {
 }
 .board-ico {
   font-size: 16px;
+}
+.range-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.range-chip {
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-faint);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.range-chip:hover {
+  border-color: var(--green);
+  color: var(--green);
+}
+.range-chip.active {
+  background: var(--green);
+  border-color: var(--green);
+  color: #fff;
+}
+.board-empty {
+  padding: 14px 6px;
+  font-size: 12.5px;
+  color: var(--text-faint);
 }
 .board-item {
   display: flex;

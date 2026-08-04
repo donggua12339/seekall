@@ -52,6 +52,9 @@ export const searchApi = {
   hot: () => http.get<unknown, HotWord[]>('/search/hot', { timeout: 5_000 }),
   resourcesHot: (limit = 8) =>
     http.get<unknown, ResourceItem[]>('/resources/hot', { params: { limit }, timeout: 5_000 }),
-  resourcesLatest: (limit = 8) =>
-    http.get<unknown, ResourceItem[]>('/resources/latest', { params: { limit }, timeout: 5_000 }),
+  resourcesLatest: (limit = 8, range?: string, category?: string) =>
+    http.get<unknown, ResourceItem[]>('/resources/latest', {
+      params: { limit, ...(range ? { range } : {}), ...(category ? { category } : {}) },
+      timeout: 5_000,
+    }),
 }
