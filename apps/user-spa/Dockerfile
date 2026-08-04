@@ -4,9 +4,12 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# 启用 pnpm + 国内镜像(Alpine 镜像构建加速)
-RUN corepack enable && corepack prepare pnpm@9.0.0 --activate \
-  && npm config set registry https://registry.npmmirror.com
+# 安装 pnpm + 国内镜像(Alpine 镜像构建加速)
+# 2026-08-04: corepack prepare 从 npmjs 拉 pnpm 网络不稳导致 build 失败,
+# 对齐 API 已验证的 npm install -g 写法(直连 npmmirror,绕过 corepack 下载)
+RUN npm install -g pnpm@9.0.0 --registry=https://registry.npmmirror.com \
+  && npm config set registry https://registry.npmmirror.com \
+  && pnpm config set registry https://registry.npmmirror.com
 
 # 先拷 workspace 配置和依赖清单(利用 docker 缓存)
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml* ./
