@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common'
+import { createHash } from 'node:crypto'
 import { MeiliSearch } from 'meilisearch'
 import type { SearchHit } from '../search/search.service'
 
@@ -59,9 +60,13 @@ export class ResourcesService implements OnModuleInit {
     }
   }
 
-  /** 归一化 url 作为主键 */
+  /**
+   * 文档主键：url 归一化后取 sha1 hex。
+   * MeiliSearch 的 document id 只允许字母/数字/-/_，URL 含 :// 等字符会直接
+   * 让整批 addDocuments 任务 failed（invalid_document_id）。
+   */
   private docId(url: string): string {
-    return url.replace(/\/+$/, '')
+    return createHash('sha1').update(url.replace(/\/+$/, '')).digest('hex')
   }
 
   /**
